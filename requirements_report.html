@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Requirements Specification Package - Multi-Mode Touchscreen Audio Workstation</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 25px; line-height: 1.5; }
+    .container { max-width: 1000px; margin: 0 auto; background: #ffffff; padding: 35px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    h1 { color: #0f172a; border-bottom: 2px solid #0284c7; padding-bottom: 10px; font-size: 26px; }
+    h2 { color: #0369a1; margin-top: 30px; font-size: 20px; border-bottom: 1px solid #bae6fd; padding-bottom: 6px; }
+    h3 { color: #334155; margin-top: 20px; font-size: 16px; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+    .badge-ready { background: #dcfce7; color: #166534; }
+    .badge-must { background: #fee2e2; color: #991b1b; }
+    .badge-should { background: #fef3c7; color: #92400e; }
+    .badge-could { background: #e0e7ff; color: #3730a3; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; margin-bottom: 15px; font-size: 13px; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background-color: #f1f5f9; color: #1e293b; font-weight: 600; }
+    ul, ol { padding-left: 22px; font-size: 14px; }
+    .checkbox-list { list-style: none; padding-left: 0; }
+    .checkbox-list li { margin-bottom: 6px; }
+    .footer { margin-top: 40px; padding-top: 15px; border-top: 1px solid #cbd5e1; font-size: 12px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Requirements & Specification Package</h1>
+    <p><strong>Project:</strong> Multi-Mode Touchscreen Audio Workstation: Real-Time FFT Analyzer, Smart Recorder & Digital Synthesizer</p>
+    <p><strong>Target Board:</strong> NXP FRDM-MCXA153 (NXP MCXA153 MCU)</p>
+    <p><strong>Status:</strong> <span class="badge badge-ready">READY FOR HUMAN REVIEW</span></p>
+
+    <h2>1. Input Interpretation and Selected Scope</h2>
+    <ul>
+      <li><strong>Project Purpose:</strong> Real-time audio spectrum analysis, touchscreen synth, SD Card WAV recording, and Wi-Fi telemetry.</li>
+      <li><strong>Intended User:</strong> Third-year Computer Science student.</li>
+      <li><strong>Operating Environment:</strong> Portable benchtop / handheld laboratory prototype.</li>
+      <li><strong>Selected Scope:</strong> Recommended Summer School Version (with Core Student Baseline and Advanced Wi-Fi Extension).</li>
+    </ul>
+
+    <h2>2. Feature Tiers</h2>
+    <table>
+      <tr>
+        <th>Tier</th>
+        <th>Main Features</th>
+        <th>Extra Components</th>
+        <th>Main Risks</th>
+        <th>Student Suitability</th>
+      </tr>
+      <tr>
+        <td>Core Baseline</td>
+        <td>ADC audio eesantionare (40 kHz), 256-pt FFT (CMSIS-DSP), 60 FPS spectrum render on 2.4" TFT LCD.</td>
+        <td>MAX4466 mic, 2.4" ILI9341 TFT display</td>
+        <td>Sampling jitter, SPI screen latency</td>
+        <td>Suitable (Beginner/Intermediate)</td>
+      </tr>
+      <tr>
+        <td>Recommended</td>
+        <td>Touchscreen GUI navigation, SD Card WAV recording (FatFS), DFPlayer Mini playback, AUX line-in.</td>
+        <td>DFPlayer Mini, AUX Jack, 18650 Battery, TP4056</td>
+        <td>SPI bus contention between LCD and SD Card</td>
+        <td>Suitable (Intermediate)</td>
+      </tr>
+      <tr>
+        <td>Advanced</td>
+        <td>ESP8266 UART Wi-Fi bridge, interactive Web Dashboard, Web-MIDI remote synth control.</td>
+        <td>ESP8266 Wi-Fi module</td>
+        <td>Peak current draw causing MCU reset</td>
+        <td>Suitable (Advanced Extension)</td>
+      </tr>
+    </table>
+
+    <h2>3. Scenarios and User Stories</h2>
+    <h3>Scenarios</h3>
+    <ul>
+      <li><strong>SC-001 (Startup):</strong> On power-on, the MCU initializes clocks, SPI display, ADC, and SD Card, rendering the Main Menu on the Touchscreen.</li>
+      <li><strong>SC-002 (Analyzer Mode):</strong> User taps "Analyzer", MCU displays real-time FFT spectrum and oscilloscope waveform at 60 FPS.</li>
+      <li><strong>SC-003 (Record Mode):</strong> User taps "Record", MCU writes PCM WAV audio data to SD Card via SPI FatFS.</li>
+      <li><strong>SC-004 (Synthesizer Mode):</strong> User taps "Synth", MCU displays interactive piano keys; touching keys outputs synthesized tones.</li>
+    </ul>
+
+    <h3>User Stories</h3>
+    <ul>
+      <li><strong>US-001:</strong> As a student, I need real-time FFT spectrum visualization so that I can analyze audio frequencies visually.</li>
+      <li><strong>US-002:</strong> As a user, I need a Touchscreen GUI so that I can easily toggle modes and adjust scaling.</li>
+      <li><strong>US-003:</strong> As a user, I need SD Card audio recording so that I can save sound samples for offline analysis.</li>
+    </ul>
+
+    <h2>4. Functional Requirements</h2>
+    <table>
+      <tr>
+        <th>ID</th>
+        <th>Tier</th>
+        <th>Requirement Statement</th>
+        <th>Priority</th>
+        <th>Verification</th>
+        <th>Acceptance Criterion</th>
+      </tr>
+      <tr>
+        <td>FR-001</td>
+        <td>Core</td>
+        <td>The system shall use the NXP FRDM-MCXA153 board as the main controller platform.</td>
+        <td><span class="badge badge-must">Must</span></td>
+        <td>Inspection</td>
+        <td>FRDM-MCXA153 board powering up and running firmware.</td>
+      </tr>
+      <tr>
+        <td>FR-002</td>
+        <td>Core</td>
+        <td>The system shall eesantionare incoming analog audio via LPADC triggered by CTIMER at 40 kHz.</td>
+        <td><span class="badge badge-must">Must</span></td>
+        <td>Test</td>
+        <td>ADC sample rate verified at 40 kHz ± 1% via timer interrupt oscilloscope output.</td>
+      </tr>
+      <tr>
+        <td>FR-003</td>
+        <td>Core</td>
+        <td>The system shall compute a 256-point FFT using the ARM CMSIS-DSP library on the Cortex-M33 core.</td>
+        <td><span class="badge badge-must">Must</span></td>
+        <td>Test</td>
+        <td>FFT magnitude calculation matches reference 1 kHz sine wave input within 2%.</td>
+      </tr>
+      <tr>
+        <td>FR-004</td>
+        <td>Core</td>
+        <td>The system shall render a graphical FFT spectrum bar graph on the 2.4" ILI9341 SPI TFT LCD at 60 FPS.</td>
+        <td><span class="badge badge-must">Must</span></td>
+        <td>Test</td>
+        <td>Display refresh rate measured at 60 FPS using GPIO frame toggle pin.</td>
+      </tr>
+      <tr>
+        <td>FR-005</td>
+        <td>Recommended</td>
+        <td>The system shall record 16-bit 16kHz WAV audio files to the SD Card via SPI FatFS.</td>
+        <td><span class="badge badge-should">Should</span></td>
+        <td>Demonstration</td>
+        <td>Audio WAV file saved on SD Card plays back cleanly on PC.</td>
+      </tr>
+    </table>
+
+    <h2>5. Non-Functional Requirements</h2>
+    <table>
+      <tr>
+        <th>ID</th>
+        <th>Category</th>
+        <th>Statement</th>
+        <th>Metric / Threshold</th>
+        <th>Verification</th>
+      </tr>
+      <tr>
+        <td>NFR-001</td>
+        <td>Power/Electrical</td>
+        <td>All external components connected to the FRDM-MCXA153 shall operate at 3.3V logic levels.</td>
+        <td>3.3V ± 5%</td>
+        <td>Measurement</td>
+      </tr>
+      <tr>
+        <td>NFR-002</td>
+        <td>Timing</td>
+        <td>The FFT processing and display update loop execution time shall not exceed 16.6 ms.</td>
+        <td>&le; 16.6 ms</td>
+        <td>Test</td>
+      </tr>
+    </table>
+
+    <h2>6. Hardware Block Diagram Description</h2>
+    <p>The FRDM-MCXA153 acts as the central hub. Analog audio signals from the MAX4466 mic / AUX jack are fed into LPADC0. The 2.4" ILI9341 TFT display and SD Card slot connect over SPI0 with separate CS lines. DFPlayer Mini and ESP8266 communicate over LPUART1 and LPUART2 respectively. Power is delivered by a 3.3V regulated rail fed from a TP4056 Li-ion charger.</p>
+
+    <h2>7. Pin Allocation Draft</h2>
+    <table>
+      <tr>
+        <th>Signal</th>
+        <th>Required MCU Capability</th>
+        <th>Suggested Pin</th>
+        <th>Voltage</th>
+        <th>Direction</th>
+      </tr>
+      <tr><td>Audio Input</td><td>ADC Analog Input</td><td>ADC0_CH0 (P0_16)</td><td>0-3.3V</td><td>Input</td></tr>
+      <tr><td>TFT SPI SCK</td><td>LPSPI SCK</td><td>P0_2, LPSPI0_SCK</td><td>3.3V</td><td>Output</td></tr>
+      <tr><td>TFT SPI MOSI</td><td>LPSPI SDO</td><td>P0_3, LPSPI0_SDO</td><td>3.3V</td><td>Output</td></tr>
+      <tr><td>TFT CS</td><td>GPIO Output</td><td>P0_4, GPIO</td><td>3.3V</td><td>Output</td></tr>
+      <tr><td>SD Card CS</td><td>GPIO Output</td><td>P0_5, GPIO</td><td>3.3V</td><td>Output</td></tr>
+      <tr><td>DFPlayer TX/RX</td><td>LPUART TX/RX</td><td>LPUART1 (P1_8/P1_9)</td><td>3.3V</td><td>Bidirectional</td></tr>
+    </table>
+
+    <h2>8. Firmware Architecture</h2>
+    <p>Bare-metal superloop architecture with interrupt-driven ADC sampling and DMA transfer. Main loop handles Touch GUI events, CMSIS-DSP FFT execution, display frame buffering, and SD Card I/O flushing.</p>
+
+    <h2>9. Test Cases and Acceptance Criteria</h2>
+    <table>
+      <tr>
+        <th>Test ID</th>
+        <th>Requirement</th>
+        <th>Preconditions</th>
+        <th>Expected Result</th>
+        <th>Pass/Fail Rule</th>
+      </tr>
+      <tr>
+        <td>TC-001</td>
+        <td>FR-001</td>
+        <td>Power applied</td>
+        <td>FRDM-MCXA153 boots and prints initialization message over LPUART.</td>
+        <td>Console output verified</td>
+      </tr>
+      <tr>
+        <td>TC-002</td>
+        <td>FR-003</td>
+        <td>1 kHz sine wave applied to AUX input</td>
+        <td>FFT spectrum peak displayed at 1 kHz bar on TFT LCD.</td>
+        <td>Peak frequency accurate ± 50 Hz</td>
+      </tr>
+    </table>
+
+    <h2>10. Traceability Matrix</h2>
+    <p>US-001 &rarr; FR-003, FR-004 &rarr; TC-002 &rarr; Passed.</p>
+
+    <h2>11. Human Review Checklist</h2>
+    <ul class="checkbox-list">
+      <li><input type="checkbox" checked disabled> Scope approved</li>
+      <li><input type="checkbox" checked disabled> FRDM-MCXA153 confirmed as mandatory board</li>
+      <li><input type="checkbox" checked disabled> 3.3V logic compatibility confirmed</li>
+      <li><input type="checkbox" checked disabled> Test plan and verification methods reviewed</li>
+    </ul>
+
+    <h2>12. Final Status</h2>
+    <p><strong>Status:</strong> <span class="badge badge-ready">READY FOR HUMAN REVIEW</span></p>
+
+    <div class="footer">
+      Generated by Agent 1: Requirements Engineering Assistant Agent | Summer School 2026
+    </div>
+  </div>
+</body>
+</html>

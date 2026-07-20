@@ -1,0 +1,309 @@
+{
+  "agent": {
+    "name": "Embedded Project Idea Scoping Agent",
+    "version": "2.2",
+    "context": "Embedded Engineering and Gen AI Summer School for third-year Computer Science students",
+    "purpose": "Convert a vague embedded project idea into a structured scoping brief for requirements engineering"
+  },
+  "source_input": {
+    "original_project_idea": "Multi-Mode Touchscreen Audio Workstation: Real-Time FFT Analyzer, Smart Recorder & Digital Synthesizer using NXP FRDM-MCXA153, 2.4-inch ILI9341 SPI TFT LCD Touchscreen with SD Card Slot, MAX4466 mic, 3.5mm AUX jacks, DFPlayer Mini MP3 player, ESP8266 Wi-Fi module, and TP4056 power module.",
+    "input_quality": "clear"
+  },
+  "fixed_platform": {
+    "board": "NXP FRDM-MCXA153",
+    "mcu": "NXP MCXA153",
+    "status": "mandatory user constraint",
+    "pin_policy": "Use generic capabilities unless exact pins are provided",
+    "logic_level_policy": "Assume 3.3 V logic unless verified otherwise"
+  },
+  "project": {
+    "name": "Multi-Mode Touchscreen Audio Workstation: Real-Time FFT Analyzer, Smart Recorder & Digital Synthesizer",
+    "short_summary": "A portable dual-mode embedded audio processing instrument on FRDM-MCXA153 featuring real-time FFT spectrum visualization, audio recording to SD Card, DFPlayer playback, touchscreen piano synth, and ESP8266 Wi-Fi telemetry.",
+    "main_objective": "Build a multi-functional digital audio workstation combining real-time signal analysis (FFT), audio storage/playback, interactive synthesis, and IoT telemetry on a single MCU platform.",
+    "intended_user": "third-year Computer Science student",
+    "operating_environment": "Laboratory / Benchtop / Portable handheld",
+    "main_behavior": "Sampling audio via ADC+DMA, rendering 60 FPS FFT spectrum on 2.4\" TFT Touch LCD, managing WAV recording/playback on SD Card, synthesizing audio notes on touch input, and streaming telemetry via ESP8266 Wi-Fi.",
+    "inputs": [
+      "MAX4466 analog microphone preamplifier",
+      "3.5mm AUX line-in jack",
+      "Resistive touchscreen on 2.4\" TFT",
+      "Onboard push buttons (SW2, SW3)",
+      "ESP8266 UART Wi-Fi commands"
+    ],
+    "outputs": [
+      "2.4\" ILI9341 SPI TFT LCD (320x240)",
+      "DFPlayer Mini audio output to 3.5mm headphone jack",
+      "MCU PWM / DAC audio output",
+      "ESP8266 UART telemetry / Web API"
+    ],
+    "interaction_flow": [
+      "Boot up & hardware self-test",
+      "Display Main Menu on Touchscreen (Mode A: Spectrum Analyzer & Recorder vs Mode B: Touch Synthesizer & Effects)",
+      "In Mode A: render live FFT spectrum/waveform, touch controls to record WAV to SD Card or trigger DFPlayer playback",
+      "In Mode B: render touch piano keyboard, synthesize waveforms on touch, trigger backing tracks from SD Card",
+      "ESP8266 streams telemetry data and handles Web-MIDI remote events in background"
+    ],
+    "out_of_scope": [
+      "Full 24-bit multi-track studio DAW recording",
+      "High-power speaker amplification above 1W",
+      "Direct 5V logic driving without level translation"
+    ]
+  },
+  "problem_space": {
+    "purpose": "Demonstrate high-performance real-time DSP, GUI rendering, file system management, and wireless IoT telemetry on Cortex-M33.",
+    "physical_process_monitored_or_controlled": "Acoustic audio signals (20Hz-20kHz) and user touch gestures.",
+    "success_criteria": [
+      "Stable 60 FPS FFT spectrum display on ILI9341 TFT LCD",
+      "Reliable WAV audio recording to SD Card via SPI",
+      "Audio playback via DFPlayer Mini without buffer underruns",
+      "Low-latency touch response for synthesizer keyboard",
+      "Wi-Fi telemetry transmission over ESP8266 UART"
+    ],
+    "known_constraints": [
+      "FRDM-MCXA153 board logic level is 3.3V",
+      "Maximum internal ADC sampling rate 40-50 kHz for audio",
+      "SPI bus shared between ILI9341 TFT and SD Card slot"
+    ],
+    "unknown_constraints": [
+      "SPI bus bandwidth limit when driving 320x240 TFT LCD and writing SD Card concurrently",
+      "Exact power consumption under full Wi-Fi TX + TFT backlight"
+    ]
+  },
+  "project_ambition": {
+    "core_student_version": {
+      "description": "Basic audio spectrum analyzer rendering live FFT on 2.4\" TFT LCD and playing pre-stored tracks via DFPlayer.",
+      "expected_difficulty": "intermediate",
+      "expected_features": [
+        "ADC audio sampling at 40 kHz",
+        "CMSIS-DSP 256-point FFT calculation",
+        "Spectrum bar graph on ILI9341 TFT LCD",
+        "Pushbutton mode toggle (SW2/SW3)"
+      ],
+      "why_it_is_suitable": "Focuses on core DSP and SPI display drivers without complex file systems or wireless networking."
+    },
+    "recommended_summer_school_version": {
+      "description": "Dual-mode Touch Audio Workstation featuring FFT spectrum, touchscreen GUI navigation, SD Card recording/playback, and DFPlayer control.",
+      "expected_difficulty": "intermediate",
+      "expected_features": [
+        "Dual-mode Touch UI (Mode A: Spectrum/Recorder, Mode B: Touch Synth)",
+        "Resistive Touchscreen calibration & navigation",
+        "WAV file recording to SD Card over FatFS/SPI",
+        "DFPlayer Mini UART control for audio playback"
+      ],
+      "why_it_is_interesting": "Combines real-time DSP, touch UI, embedded file systems, and hardware audio decoding into a rich student demo.",
+      "why_it_is_still_feasible": "Achievable within summer school timeframe using modular drivers and FreeRTOS / superloop architecture."
+    },
+    "advanced_extension": {
+      "description": "Full IoT Connected Workstation with ESP8266 Web Dashboard, Web-MIDI remote control, and cloud telemetry logging.",
+      "expected_difficulty": "advanced",
+      "advanced_features": [
+        "ESP8266 UART Wi-Fi bridge hosting interactive Web Dashboard",
+        "Web-MIDI remote synth triggering over Wi-Fi",
+        "MQTT/HTTP cloud telemetry logging of spectral data"
+      ],
+      "extra_components": [
+        "ESP8266 Wi-Fi Module"
+      ],
+      "technical_challenges": [
+        "Multi-protocol concurrent communication (SPI TFT, SPI SD, UART DFPlayer, UART ESP8266)",
+        "DMA buffer synchronization under heavy CPU load"
+      ],
+      "risk_controls": [
+        "Isolate ESP8266 tasks to non-blocking background UART queues",
+        "Provide fallback standalone mode if Wi-Fi connection fails"
+      ],
+      "can_be_optional": true
+    }
+  },
+  "target_hardware": {
+    "main_board": {
+      "name": "NXP FRDM-MCXA153",
+      "mcu": "NXP MCXA153",
+      "reasoning": "Mandatory board for all summer school projects",
+      "approval_status": "user_provided"
+    },
+    "sensors": [
+      {
+        "name": "MAX4466 Microphone Module",
+        "purpose": "Acoustic audio signal capture",
+        "likely_interface": "Analog ADC input",
+        "used_in_version": "core",
+        "voltage_or_signal_notes": "3.3V VCC, analog output centered at VCC/2 (1.65V)",
+        "risks": [
+          "Overvoltage input spike if exposed to high volume"
+        ]
+      }
+    ],
+    "actuators_outputs": [
+      {
+        "name": "DFPlayer Mini MP3/WAV Player",
+        "purpose": "Hardware audio playback to headphone jack",
+        "likely_interface": "UART (9600 baud)",
+        "used_in_version": "recommended",
+        "voltage_or_power_notes": "Requires 3.3V-5V VCC; RX line needs 1k resistor if driven from 5V system",
+        "risks": [
+          "Peak current consumption when driving low-impedance headphones"
+        ]
+      }
+    ],
+    "user_inputs": [
+      {
+        "name": "Resistive Touchscreen (XPT2046 / Analog)",
+        "purpose": "GUI menu navigation and piano synth keyboard",
+        "likely_interface": "SPI / ADC pins",
+        "used_in_version": "recommended",
+        "notes": "Requires touch calibration routine"
+      },
+      {
+        "name": "Onboard Pushbuttons (SW2, SW3)",
+        "purpose": "Quick mode toggle and hardware reset/trigger",
+        "likely_interface": "GPIO with interrupt / pullup",
+        "used_in_version": "core",
+        "notes": "Directly connected to MCU GPIO pins"
+      }
+    ],
+    "display_ui": [
+      {
+        "name": "2.4\" ILI9341 SPI TFT LCD Display",
+        "purpose": "Real-time FFT spectrum, waveform, and Touch GUI rendering",
+        "likely_interface": "SPI + CS/DC/RST GPIOs",
+        "used_in_version": "core",
+        "notes": "3.3V logic compatible"
+      }
+    ],
+    "communication_debug": [
+      {
+        "name": "ESP8266 Wi-Fi Module",
+        "purpose": "Wireless web dashboard and cloud telemetry",
+        "likely_interface": "UART (115200 baud)",
+        "used_in_version": "advanced",
+        "notes": "Requires stable 3.3V power supply (up to 300mA peak during Wi-Fi TX)"
+      }
+    ],
+    "power_source": {
+      "recommended_power": "18650 Li-ion battery via TP4056 charger and 3.3V regulator",
+      "notes": "Provides portable 3.3V clean power rail",
+      "risks": [
+        "High current surge during Wi-Fi transmission"
+      ]
+    },
+    "optional_advanced_components": [
+      {
+        "name": "3.5mm AUX Stereo Line-In Jack",
+        "purpose": "Direct audio signal measurement from external phone/instrument",
+        "reason_to_include": "Enables precise oscilloscope measurements without acoustic room noise",
+        "reason_to_exclude": "Requires Zener diode input protection circuit",
+        "risks": [
+          "Input signals exceeding 0-3.3V range"
+        ]
+      }
+    ]
+  },
+  "software_context": {
+    "recommended_development_environment": "MCUXpresso SDK + CMake + VS Code / MCUXpresso IDE",
+    "recommended_sdk_or_libraries": [
+      "fsl_lpadc",
+      "fsl_lpspi",
+      "fsl_lpuart",
+      "fsl_ctimer",
+      "ARM CMSIS-DSP (arm_cfft_f32)",
+      "FatFS SD Card Library"
+    ],
+    "programming_language": "C",
+    "existing_codebase": "new_project",
+    "suggested_starting_point": "FRDM-MCXA153 SDK LPI2C / LPSPI / LPADC baseline examples",
+    "debugging_interfaces": [
+      "LPUART0 Debug Console (115200 baud)",
+      "SWD JTAG/SWD Debugger"
+    ],
+    "possible_gen_ai_usage": [
+      "requirements drafting",
+      "test case generation",
+      "code review",
+      "debugging support",
+      "documentation generation"
+    ]
+  },
+  "constraints": {
+    "target_board": "NXP FRDM-MCXA153 is mandatory",
+    "voltage": "Assume 3.3 V logic unless verified otherwise",
+    "power": "3.3V regulator must support 500mA peak current",
+    "timing": "FFT calculation & screen refresh loop within 16.6ms (60 FPS)",
+    "memory": "MCXA153 SRAM footprint within 128KB",
+    "safety": "Input voltage clamping (0V to 3.3V) on analog inputs",
+    "privacy_security": "Local audio storage on SD Card; Wi-Fi telemetry opt-in",
+    "student_level": "third-year university Computer Science students"
+  },
+  "complexity": {
+    "core_level": "intermediate",
+    "recommended_level": "intermediate",
+    "advanced_level": "advanced",
+    "student_suitability": "suitable",
+    "reason": "Uses standard MCUXpresso SDK drivers, CMSIS-DSP library, and modular peripheral interfaces."
+  },
+  "facts_provided_by_user": [
+    "Board is NXP FRDM-MCXA153",
+    "Display is 2.4\" ILI9341 SPI TFT LCD with Touchscreen and SD Card slot",
+    "Audio input via MAX4466 mic and 3.5mm AUX jack",
+    "Audio output via DFPlayer Mini and 3.5mm headphone jack",
+    "Wi-Fi via ESP8266 module",
+    "Power via TP4056 Li-ion charger"
+  ],
+  "assumptions": [
+    {
+      "id": "A-001",
+      "assumption": "The ILI9341 TFT display controller and SD Card slot share the SPI bus using separate Chip Select (CS) GPIO lines.",
+      "reason": "Standard breakout board pinout for ILI9341 + SD slot",
+      "requires_human_approval": true
+    },
+    {
+      "id": "A-002",
+      "assumption": "Analog audio input uses a 10k resistor and 3.3V Zener diode for overvoltage protection.",
+      "reason": "Protects MCXA153 ADC pin from excessive voltage swings",
+      "requires_human_approval": true
+    }
+  ],
+  "open_questions": [
+    {
+      "id": "Q-001",
+      "question": "Will SPI bus sharing between LCD and SD Card cause frame drops during SD writing?",
+      "why_it_matters": "Determines if double-buffering or DMA priority is required"
+    }
+  ],
+  "risks": {
+    "technical": [
+      "SPI bus contention between TFT display and SD Card",
+      "ADC sampling noise from Wi-Fi module power spikes"
+    ],
+    "safety": [
+      "Li-ion battery short circuit if un-protected"
+    ],
+    "voltage_power": [
+      "Inadequate 3.3V power rail causing MCU brown-out when ESP8266 transmits"
+    ],
+    "timing": [
+      "FFT computation taking longer than 16.6ms at high resolution"
+    ],
+    "memory": [
+      "Audio recording buffer overflowing internal SRAM"
+    ],
+    "privacy_security": [
+      "Unencrypted Wi-Fi transmission of audio telemetry"
+    ],
+    "advanced_feature_risks": [
+      "ESP8266 UART packet drops under heavy web traffic"
+    ]
+  },
+  "human_approval_required": [
+    "Confirm SPI CS pin allocations for ILI9341 and SD Card slot",
+    "Approve analog input Zener protection circuit"
+  ],
+  "handoff_to_requirements_agent": {
+    "ready_for_requirements_engineering": true,
+    "recommended_scope_for_requirements": "recommended",
+    "readiness_status": "ready",
+    "readiness_notes": "Scoping brief is complete and ready for requirements expansion.",
+    "critical_missing_information": [],
+    "recommended_next_agent": "Requirements Engineering Assistant Agent"
+  }
+}

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Project Scoping Brief - Multi-Mode Touchscreen Audio Workstation</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 20px; line-height: 1.5; }
+    .container { max-width: 900px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    h1 { color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; font-size: 24px; }
+    h2 { color: #1e293b; margin-top: 25px; font-size: 18px; border-bottom: 1px solid #cbd5e1; padding-bottom: 5px; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; }
+    .badge-mandatory { background: #fee2e2; color: #991b1b; }
+    .badge-ready { background: #dcfce7; color: #166534; }
+    .badge-tier { background: #e0f2fe; color: #075985; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
+    th { background-color: #f1f5f9; color: #334155; }
+    ul { padding-left: 20px; font-size: 14px; }
+    .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Embedded Project Scoping Brief</h1>
+    <p><strong>Project Name:</strong> Multi-Mode Touchscreen Audio Workstation: Real-Time FFT Analyzer, Smart Recorder & Digital Synthesizer</p>
+    <p><strong>Status:</strong> <span class="badge badge-ready">READY FOR REQUIREMENTS ENGINEERING</span></p>
+
+    <h2>1. Fixed Platform Constraint</h2>
+    <table>
+      <tr><th>Target Board</th><td>NXP FRDM-MCXA153</td></tr>
+      <tr><th>Target MCU</th><td>NXP MCXA153 (ARM Cortex-M33)</td></tr>
+      <tr><th>Constraint Status</th><td><span class="badge badge-mandatory">Mandatory Platform</span></td></tr>
+      <tr><th>Logic Level Policy</th><td>Assume 3.3V logic compatibility unless level shifter is used.</td></tr>
+    </table>
+
+    <h2>2. Project Summary & Objectives</h2>
+    <p>A portable dual-mode embedded audio processing instrument built on the NXP FRDM-MCXA153 platform. It features real-time FFT spectrum visualization, audio recording to SD Card, DFPlayer playback, touchscreen piano synthesis, and ESP8266 Wi-Fi telemetry.</p>
+    <ul>
+      <li><strong>Operating Environment:</strong> Laboratory / Benchtop / Handheld</li>
+      <li><strong>Main Behavior:</strong> ADC+DMA audio eesantionare, 60 FPS FFT rendering on 2.4" TFT Touch LCD, FatFS SD Card recording, DFPlayer MP3/WAV playback, and UART Wi-Fi streaming.</li>
+    </ul>
+
+    <h2>3. Project Ambition Tiers</h2>
+    <table>
+      <tr>
+        <th>Tier</th>
+        <th>Description</th>
+        <th>Key Features</th>
+      </tr>
+      <tr>
+        <td><span class="badge badge-tier">Core Student Version</span></td>
+        <td>Basic audio spectrum analyzer rendering live FFT on 2.4" TFT LCD.</td>
+        <td>ADC sampling, CMSIS-DSP 256-point FFT, spectrum bar graph, pushbutton mode toggle.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-tier">Recommended Version</span></td>
+        <td>Dual-mode Touch Audio Workstation with SD Card recording and DFPlayer playback.</td>
+        <td>Dual-mode Touch UI, SD Card WAV recording (FatFS), DFPlayer Mini UART control.</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-tier">Advanced Extension</span></td>
+        <td>IoT Connected Workstation with ESP8266 Web Dashboard and Web-MIDI control.</td>
+        <td>ESP8266 UART Wi-Fi bridge, interactive web dashboard, cloud telemetry.</td>
+      </tr>
+    </table>
+
+    <h2>4. Hardware Architecture Overview</h2>
+    <table>
+      <tr><th>Component</th><th>Purpose</th><th>Interface</th><th>Tier</th></tr>
+      <tr><td>FRDM-MCXA153</td><td>Main Controller MCU</td><td>N/A</td><td>Core</td></tr>
+      <tr><td>2.4" ILI9341 TFT + Touch + SD</td><td>Graphical Display, Touch UI & File Storage</td><td>SPI / GPIO</td><td>Core</td></tr>
+      <tr><td>MAX4466 Microphone Module</td><td>Acoustic Audio Signal Capture</td><td>ADC Analog Input</td><td>Core</td></tr>
+      <tr><td>3.5mm AUX Line-In Jack</td><td>Direct Analog Signal Measurement</td><td>ADC Analog Input</td><td>Recommended</td></tr>
+      <tr><td>DFPlayer Mini Module</td><td>Hardware MP3/WAV Audio Playback</td><td>UART (9600 baud)</td><td>Recommended</td></tr>
+      <tr><td>ESP8266 Wi-Fi Module</td><td>Wireless Telemetry & Web Dashboard</td><td>UART (115200 baud)</td><td>Advanced</td></tr>
+      <tr><td>TP4056 + 18650 Battery</td><td>Portable Power Supply</td><td>3.3V Power Rail</td><td>Recommended</td></tr>
+    </table>
+
+    <h2>5. Risks & Assumptions</h2>
+    <ul>
+      <li><strong>A-001:</strong> ILI9341 LCD and SD Card slot share the SPI bus using separate CS lines.</li>
+      <li><strong>Risk 1:</strong> SPI bus bandwidth contention between LCD rendering and SD writing.</li>
+      <li><strong>Risk 2:</strong> ESP8266 peak current draw causing 3.3V voltage dip during Wi-Fi transmission.</li>
+    </ul>
+
+    <div class="footer">
+      Generated by Agent 0: Embedded Project Idea Scoping Agent (v2.2) | Summer School 2026
+    </div>
+  </div>
+</body>
+</html>
