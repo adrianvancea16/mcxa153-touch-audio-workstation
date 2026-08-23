@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Requirements Specification Package - Multi-Mode Touchscreen Audio Workstation</title>
+  <title>Requirements Specification Package - Dual-Mode Embedded Audio Workstation</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 25px; line-height: 1.5; }
     .container { max-width: 1000px; margin: 0 auto; background: #ffffff; padding: 35px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
@@ -26,13 +26,13 @@
 <body>
   <div class="container">
     <h1>Requirements & Specification Package</h1>
-    <p><strong>Project:</strong> Multi-Mode Touchscreen Audio Workstation: Real-Time FFT Analyzer, Smart Recorder & Digital Synthesizer</p>
+    <p><strong>Project:</strong> Dual-Mode Embedded Audio Workstation (Real-Time FFT Analyzer, Smart Recorder & Touch Synthesizer)</p>
     <p><strong>Target Board:</strong> NXP FRDM-MCXA153 (NXP MCXA153 MCU)</p>
     <p><strong>Status:</strong> <span class="badge badge-ready">READY FOR HUMAN REVIEW</span></p>
 
     <h2>1. Input Interpretation and Selected Scope</h2>
     <ul>
-      <li><strong>Project Purpose:</strong> Real-time audio spectrum analysis, touchscreen synth, SD Card WAV recording, and Wi-Fi telemetry.</li>
+      <li><strong>Project Purpose:</strong> Real-time audio spectrum & oscilloscope visualization, bare-metal WAV recording to SD Card, touchscreen piano synth with digital audio effects, and local Wi-Fi web control.</li>
       <li><strong>Intended User:</strong> Third-year Computer Science student.</li>
       <li><strong>Operating Environment:</strong> Portable benchtop / handheld laboratory prototype.</li>
       <li><strong>Selected Scope:</strong> Recommended Summer School Version (with Core Student Baseline and Advanced Wi-Fi Extension).</li>
@@ -49,23 +49,23 @@
       </tr>
       <tr>
         <td>Core Baseline</td>
-        <td>ADC audio eesantionare (40 kHz), 256-pt FFT (CMSIS-DSP), 60 FPS spectrum render on 2.4" TFT LCD.</td>
-        <td>MAX4466 mic, 2.4" ILI9341 TFT display</td>
-        <td>Sampling jitter, SPI screen latency</td>
+        <td>ADC audio sampling (40 kHz), 256-pt FFT (CMSIS-DSP), 60 FPS spectrum and oscilloscope render on 2.4" TFT LCD.</td>
+        <td>MAX4466 mic, 2.4" ILI9341 TFT display, Button 1 (Mode Change), Button 2 (Reset).</td>
+        <td>Sampling jitter, SPI screen latency.</td>
         <td>Suitable (Beginner/Intermediate)</td>
       </tr>
       <tr>
         <td>Recommended</td>
-        <td>Touchscreen GUI navigation, SD Card WAV recording (FatFS), DFPlayer Mini playback, AUX line-in.</td>
-        <td>DFPlayer Mini, AUX Jack, 18650 Battery, TP4056</td>
-        <td>SPI bus contention between LCD and SD Card</td>
+        <td>Resistive Touchscreen GUI navigation, bare-metal WAV recording to SD Card (FatFS), touchscreen piano keyboard & modulation pad, digital audio filtering (reverb/low-pass), and internal DAC audio output to 3.5mm jack.</td>
+        <td>3.5mm headphone jack breakout, 1k resistor, 100nF capacitor.</td>
+        <td>SPI bus contention between LCD, Touch, and SD Card. Direct DAC drive loading.</td>
         <td>Suitable (Intermediate)</td>
       </tr>
       <tr>
         <td>Advanced</td>
-        <td>ESP8266 UART Wi-Fi bridge, interactive Web Dashboard, Web-MIDI remote synth control.</td>
-        <td>ESP8266 Wi-Fi module</td>
-        <td>Peak current draw causing MCU reset</td>
+        <td>ESP8266 UART Wi-Fi hosting local Web Server, wireless telemetry browser dashboard, and remote parameter control.</td>
+        <td>ESP8266 Wi-Fi module.</td>
+        <td>Peak current draw causing MCU reset, UART packet drops under heavy DSP load.</td>
         <td>Suitable (Advanced Extension)</td>
       </tr>
     </table>
@@ -73,17 +73,19 @@
     <h2>3. Scenarios and User Stories</h2>
     <h3>Scenarios</h3>
     <ul>
-      <li><strong>SC-001 (Startup):</strong> On power-on, the MCU initializes clocks, SPI display, ADC, and SD Card, rendering the Main Menu on the Touchscreen.</li>
+      <li><strong>SC-001 (Startup):</strong> On power-on, the MCU initializes clocks, SPI display, ADC, DAC, and SD Card, rendering the Main Menu on the Touchscreen.</li>
       <li><strong>SC-002 (Analyzer Mode):</strong> User taps "Analyzer", MCU displays real-time FFT spectrum and oscilloscope waveform at 60 FPS.</li>
-      <li><strong>SC-003 (Record Mode):</strong> User taps "Record", MCU writes PCM WAV audio data to SD Card via SPI FatFS.</li>
-      <li><strong>SC-004 (Synthesizer Mode):</strong> User taps "Synth", MCU displays interactive piano keys; touching keys outputs synthesized tones.</li>
+      <li><strong>SC-003 (Record Mode):</strong> User taps "Record", MCU samples microphone and streams PCM WAV audio data directly to SD Card via SPI FatFS.</li>
+      <li><strong>SC-004 (Synthesizer Mode):</strong> User taps "Synth", MCU displays interactive piano keys and XY modulation pad; touching keys outputs synthesized waveforms (sine/triangle) and applies filters, routing output to internal DAC.</li>
+      <li><strong>SC-005 (Wireless Control):</strong> ESP8266 hosts a local web page. A user connects via phone/laptop browser to monitor the audio frequency peaks and toggle modes remotely.</li>
     </ul>
 
     <h3>User Stories</h3>
     <ul>
-      <li><strong>US-001:</strong> As a student, I need real-time FFT spectrum visualization so that I can analyze audio frequencies visually.</li>
-      <li><strong>US-002:</strong> As a user, I need a Touchscreen GUI so that I can easily toggle modes and adjust scaling.</li>
-      <li><strong>US-003:</strong> As a user, I need SD Card audio recording so that I can save sound samples for offline analysis.</li>
+      <li><strong>US-001:</strong> As a student, I need real-time FFT spectrum and oscilloscope visualization so that I can analyze audio frequencies visually.</li>
+      <li><strong>US-002:</strong> As a user, I need a Touchscreen GUI so that I can easily toggle modes and navigate synth settings.</li>
+      <li><strong>US-003:</strong> As a user, I need direct SD Card WAV recording so that I can capture ambient sounds bare-metal.</li>
+      <li><strong>US-004:</strong> As a user, I need headphone output directly from the MCU's internal DAC so that I can listen to generated synthesizer tones and filtered audio.</li>
     </ul>
 
     <h2>4. Functional Requirements</h2>
@@ -107,7 +109,7 @@
       <tr>
         <td>FR-002</td>
         <td>Core</td>
-        <td>The system shall eesantionare incoming analog audio via LPADC triggered by CTIMER at 40 kHz.</td>
+        <td>The system shall sample incoming analog audio via LPADC triggered by CTIMER at 40 kHz.</td>
         <td><span class="badge badge-must">Must</span></td>
         <td>Test</td>
         <td>ADC sample rate verified at 40 kHz ± 1% via timer interrupt oscilloscope output.</td>
@@ -126,15 +128,31 @@
         <td>The system shall render a graphical FFT spectrum bar graph on the 2.4" ILI9341 SPI TFT LCD at 60 FPS.</td>
         <td><span class="badge badge-must">Must</span></td>
         <td>Test</td>
-        <td>Display refresh rate measured at 60 FPS using GPIO frame toggle pin.</td>
+        <td>Display refresh rate measured at &ge; 55 FPS using GPIO frame toggle pin.</td>
       </tr>
       <tr>
         <td>FR-005</td>
         <td>Recommended</td>
-        <td>The system shall record 16-bit 16kHz WAV audio files to the SD Card via SPI FatFS.</td>
+        <td>The system shall record 16-bit 16kHz WAV audio files directly to the SD Card via SPI FatFS.</td>
         <td><span class="badge badge-should">Should</span></td>
         <td>Demonstration</td>
         <td>Audio WAV file saved on SD Card plays back cleanly on PC.</td>
+      </tr>
+      <tr>
+        <td>FR-006</td>
+        <td>Recommended</td>
+        <td>The system shall generate real-time digital synthesizer waveforms and apply filters (low-pass/reverb) outputting through the internal DAC.</td>
+        <td><span class="badge badge-should">Should</span></td>
+        <td>Test</td>
+        <td>DAC outputs clean audio tones corresponding to touch inputs to a 3.5mm jack.</td>
+      </tr>
+      <tr>
+        <td>FR-007</td>
+        <td>Advanced</td>
+        <td>The system shall stream telemetry data and receive remote system commands via an ESP8266 hosting a local web page.</td>
+        <td><span class="badge badge-could">Could</span></td>
+        <td>Demonstration</td>
+        <td>Browser client connects to ESP8266 web server to view telemetry and control mode.</td>
       </tr>
     </table>
 
@@ -143,7 +161,7 @@
       <tr>
         <th>ID</th>
         <th>Category</th>
-        <th>Statement</th>
+        <th>Requirement Statement</th>
         <th>Metric / Threshold</th>
         <th>Verification</th>
       </tr>
@@ -161,30 +179,46 @@
         <td>&le; 16.6 ms</td>
         <td>Test</td>
       </tr>
+      <tr>
+        <td>NFR-003</td>
+        <td>Timing</td>
+        <td>Synthesizer audio block processing and internal DAC write latency shall be under 10 ms.</td>
+        <td>&le; 10 ms</td>
+        <td>Test</td>
+      </tr>
     </table>
 
     <h2>6. Hardware Block Diagram Description</h2>
-    <p>The FRDM-MCXA153 acts as the central hub. Analog audio signals from the MAX4466 mic / AUX jack are fed into LPADC0. The 2.4" ILI9341 TFT display and SD Card slot connect over SPI0 with separate CS lines. DFPlayer Mini and ESP8266 communicate over LPUART1 and LPUART2 respectively. Power is delivered by a 3.3V regulated rail fed from a TP4056 Li-ion charger.</p>
+    <p>The FRDM-MCXA153 acts as the central hub. Analog audio signals from the MAX4466 microphone preamplifier are fed into LPADC0. The 2.4" ILI9341 TFT display, resistive Touch controller, and SD Card slot connect over SPI0 using separate CS lines. The internal DAC drives a 3.5mm headphone jack through a 1k&Omega; series resistor. An ESP8266 Wi-Fi module communicates over LPUART2 to host a local web server. Power is delivered entirely through standard USB power supplying the FRDM-MCXA153 board, which distributes 3.3V to all external components.</p>
 
     <h2>7. Pin Allocation Draft</h2>
     <table>
       <tr>
-        <th>Signal</th>
-        <th>Required MCU Capability</th>
-        <th>Suggested Pin</th>
+        <th>Component & Signal</th>
+        <th>MCU Peripheral Requirement</th>
+        <th>Allocated MCU Pin</th>
         <th>Voltage</th>
         <th>Direction</th>
       </tr>
-      <tr><td>Audio Input</td><td>ADC Analog Input</td><td>ADC0_CH0 (P0_16)</td><td>0-3.3V</td><td>Input</td></tr>
-      <tr><td>TFT SPI SCK</td><td>LPSPI SCK</td><td>P0_2, LPSPI0_SCK</td><td>3.3V</td><td>Output</td></tr>
-      <tr><td>TFT SPI MOSI</td><td>LPSPI SDO</td><td>P0_3, LPSPI0_SDO</td><td>3.3V</td><td>Output</td></tr>
-      <tr><td>TFT CS</td><td>GPIO Output</td><td>P0_4, GPIO</td><td>3.3V</td><td>Output</td></tr>
-      <tr><td>SD Card CS</td><td>GPIO Output</td><td>P0_5, GPIO</td><td>3.3V</td><td>Output</td></tr>
-      <tr><td>DFPlayer TX/RX</td><td>LPUART TX/RX</td><td>LPUART1 (P1_8/P1_9)</td><td>3.3V</td><td>Bidirectional</td></tr>
+      <tr><td>MAX4466 Microphone OUT</td><td>LPADC Analog Input</td><td>NXP P1_10 (ADC0)</td><td>0-3.3V</td><td>Input</td></tr>
+      <tr><td>TFT/Touch/SD SPI SCK</td><td>LPSPI Clock</td><td>NXP P2_12 (LPSPI0_SCK)</td><td>3.3V</td><td>Output</td></tr>
+      <tr><td>TFT/Touch/SD SPI MOSI (SDI)</td><td>LPSPI Data Out</td><td>NXP P2_13 (LPSPI0_SDO)</td><td>3.3V</td><td>Output</td></tr>
+      <tr><td>TFT/Touch/SD SPI MISO (SDO)</td><td>LPSPI Data In</td><td>NXP P2_16 (LPSPI0_SDI)</td><td>3.3V</td><td>Input</td></tr>
+      <tr><td>TFT Chip Select (CS)</td><td>GPIO Output</td><td>NXP P2_6</td><td>3.3V</td><td>Output</td></tr>
+      <tr><td>TFT Data/Command (D/C)</td><td>GPIO Output</td><td>NXP P3_0</td><td>3.3V</td><td>Output</td></tr>
+      <tr><td>TFT Reset (RESET)</td><td>GPIO Output</td><td>NXP P2_5</td><td>3.3V</td><td>Output</td></tr>
+      <tr><td>Touch Chip Select (T_CS)</td><td>GPIO Output</td><td>NXP P3_1</td><td>3.3V</td><td>Output</td></tr>
+      <tr><td>Touch Interrupt (T_IRQ)</td><td>GPIO Input / Interrupt</td><td>NXP P2_4</td><td>3.3V</td><td>Input</td></tr>
+      <tr><td>SD Card Chip Select (SD_CS)</td><td>GPIO Output</td><td>NXP P1_3</td><td>3.3V</td><td>Output</td></tr>
+      <tr><td>3.5mm Headphone Jack (Signal)</td><td>Internal DAC Output</td><td>NXP P3_12 (DAC_OUT)</td><td>0-3.3V</td><td>Output</td></tr>
+      <tr><td>ESP8266 TX (Module Transmit)</td><td>LPUART Receive</td><td>NXP P1_4 (LPUART2_RXD)</td><td>3.3V</td><td>Input</td></tr>
+      <tr><td>ESP8266 RX (Module Receive)</td><td>LPUART Transmit</td><td>NXP P1_5 (LPUART2_TXD)</td><td>3.3V</td><td>Output</td></tr>
+      <tr><td>Button 1 (UI Mode Change)</td><td>GPIO Input (internal Pull-up)</td><td>NXP P2_2</td><td>3.3V</td><td>Input</td></tr>
+      <tr><td>Button 2 (System Reset)</td><td>MCU Hardware RESET</td><td>RESET Pin</td><td>3.3V</td><td>Input</td></tr>
     </table>
 
     <h2>8. Firmware Architecture</h2>
-    <p>Bare-metal superloop architecture with interrupt-driven ADC sampling and DMA transfer. Main loop handles Touch GUI events, CMSIS-DSP FFT execution, display frame buffering, and SD Card I/O flushing.</p>
+    <p>Bare-metal superloop architecture with interrupt-driven ADC sampling and DMA transfer. Main loop handles Touch GUI events, CMSIS-DSP FFT execution, display frame buffering, and SD Card I/O flushing. Audio synthesis utilizes a high-priority timer interrupt driving the internal DAC at 16 kHz to guarantee jitter-free audio reproduction.</p>
 
     <h2>9. Test Cases and Acceptance Criteria</h2>
     <table>
@@ -198,21 +232,40 @@
       <tr>
         <td>TC-001</td>
         <td>FR-001</td>
-        <td>Power applied</td>
-        <td>FRDM-MCXA153 boots and prints initialization message over LPUART.</td>
+        <td>Power applied via USB</td>
+        <td>FRDM-MCXA153 boots and prints initialization message over LPUART0.</td>
         <td>Console output verified</td>
       </tr>
       <tr>
         <td>TC-002</td>
         <td>FR-003</td>
-        <td>1 kHz sine wave applied to AUX input</td>
+        <td>1 kHz audio signal input to microphone</td>
         <td>FFT spectrum peak displayed at 1 kHz bar on TFT LCD.</td>
         <td>Peak frequency accurate ± 50 Hz</td>
+      </tr>
+      <tr>
+        <td>TC-003</td>
+        <td>FR-006</td>
+        <td>User touches piano synth interface</td>
+        <td>MCU generates synth waveforms and internal DAC outputs clean audio to headphones.</td>
+        <td>Audible, low-distortion pitch matches keys</td>
+      </tr>
+      <tr>
+        <td>TC-004</td>
+        <td>FR-007</td>
+        <td>ESP8266 active and web dashboard loaded</td>
+        <td>Web dashboard accurately displays live FFT spectrum statistics remotely.</td>
+        <td>Telemetry updates at &ge; 5 Hz on browser</td>
       </tr>
     </table>
 
     <h2>10. Traceability Matrix</h2>
-    <p>US-001 &rarr; FR-003, FR-004 &rarr; TC-002 &rarr; Passed.</p>
+    <ul>
+      <li>US-001 &rarr; FR-002, FR-003, FR-004 &rarr; TC-002</li>
+      <li>US-002 &rarr; FR-006 &rarr; TC-003</li>
+      <li>US-003 &rarr; FR-005 &rarr; Inspection of SD WAV files</li>
+      <li>US-004 &rarr; FR-006 &rarr; TC-003</li>
+    </ul>
 
     <h2>11. Human Review Checklist</h2>
     <ul class="checkbox-list">
