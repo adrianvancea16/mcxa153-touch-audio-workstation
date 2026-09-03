@@ -6,7 +6,7 @@
       "request": "launch",
       "cwd": "${workspaceFolder}",
       "executable": {
-        "elf": ""
+        "elf": "${workspaceFolder}/debug/MCXA153_Touch_Audio_Workstation.elf"
       },
       "stopAtSymbol": "main",
       "probeSerialNumber": "",

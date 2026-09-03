@@ -5,10 +5,10 @@
   "trustZoneType": "none",
   "multicoreType": "none",
   "projectType": "sdk-v2-freestanding",
-  "projectName": "Lab_DinosaurGame",
+  "projectName": "MCXA153_Touch_Audio_Workstation",
   "sdk": {
     "version": "26.6.0",
-    "path": "${userHome}/Facultate/Proiecte/NXP_Summer_School/mcuxsdk",
+    "path": "",
     "boardId": "frdmmcxa153",
     "deviceId": "MCXA153",
     "coreId": "cm33_core0"
