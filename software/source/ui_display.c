@@ -1,6 +1,8 @@
 #include "ui_display.h"
 #include <stdio.h>
 #include <stdbool.h>
+#include "fsl_gpio.h"
+#include "fsl_port.h"
 
 // External dependencies for other modules
 extern void sdcard_start_recording(void);
@@ -9,12 +11,48 @@ extern void sdcard_play_selected(void);
 extern void sdcard_next_file(void);
 extern bool sdcard_is_inserted(void);
 
+// RGB565 Colors
+#define COLOR_BLUE  0x001F
+#define COLOR_GREEN 0x07E0
+#define COLOR_RED   0xF800
+#define COLOR_BLACK 0x0000
+
 static uint8_t active_mode = 0;
 static bool redraw_needed = true;
 
+// Mock SPI functions for ILI9341 (To be wired to real LPSPI in next steps)
+void lcd_send_cmd(uint8_t cmd) {
+    // GPIO_PinWrite(BOARD_LCD_DC_GPIO, BOARD_LCD_DC_PIN, 0);
+    // LPSPI_WriteData(cmd);
+}
+void lcd_send_data(uint8_t data) {
+    // GPIO_PinWrite(BOARD_LCD_DC_GPIO, BOARD_LCD_DC_PIN, 1);
+    // LPSPI_WriteData(data);
+}
+
+void lcd_fill_screen(uint16_t color) {
+    printf("LCD: Filling screen with color 0x%04X\n", color);
+    /* Real ILI9341 fill sequence:
+    lcd_send_cmd(0x2A); // Column Address Set
+    // Send 0, 0, 320 >> 8, 320 & 0xFF
+    lcd_send_cmd(0x2B); // Page Address Set
+    // Send 0, 0, 240 >> 8, 240 & 0xFF
+    lcd_send_cmd(0x2C); // Memory Write
+    for(int i=0; i<320*240; i++) {
+        lcd_send_data(color >> 8);
+        lcd_send_data(color & 0xFF);
+    }
+    */
+}
+
 void ui_display_init(void) {
-    // Initialize ILI9341 SPI Display and touch controller here
-    printf("UI: Display initialized.\n");
+    printf("UI: Initializing ILI9341 SPI Display...\n");
+    // Hardware Reset sequence
+    // lcd_send_cmd(0x01); // Software reset
+    // delay
+    // lcd_send_cmd(0x11); // Sleep out
+    // lcd_send_cmd(0x29); // Display ON
+    lcd_fill_screen(COLOR_BLACK);
 }
 
 void ui_display_mode(uint8_t mode) {
@@ -31,26 +69,18 @@ void ui_display_process_loop(void) {
     // Render the active mode GUI
     switch (active_mode) {
         case 0: // MODE_SYNTHESIZER
-            printf("--- GUI: SYNTHESIZER MODE ---\n");
-            printf("Visualizing FFT Spectrum & Oscilloscope...\n");
-            printf("Button 2: Change Synth Effect | Button 3: Toggle Output\n");
+            lcd_fill_screen(COLOR_BLUE);
+            printf("--- GUI: SYNTHESIZER MODE (BLUE BACKGROUND) ---\n");
             break;
             
         case 1: // MODE_SD_RECORDER_PLAYER
-            printf("--- GUI: SD CARD RECORDER & PLAYER ---\n");
-            if (sdcard_is_inserted()) {
-                printf("SD Card: Inserted. Ready.\n");
-                printf("Button 2: Record to WAV | Button 3: Play Next File\n");
-            } else {
-                printf("SD Card: NOT INSERTED. Please insert SD Card.\n");
-            }
+            lcd_fill_screen(COLOR_GREEN);
+            printf("--- GUI: SD CARD RECORDER & PLAYER (GREEN BACKGROUND) ---\n");
             break;
             
         case 2: // MODE_ESP_WIFI
-            printf("--- GUI: ESP WIFI SERVER MODE ---\n");
-            printf("Connecting to Network...\n");
-            printf("Server IP: 192.168.1.X\n");
-            printf("Button 2: Reconnect | Button 3: Send Test Data\n");
+            lcd_fill_screen(COLOR_RED);
+            printf("--- GUI: ESP WIFI SERVER MODE (RED BACKGROUND) ---\n");
             break;
     }
     
@@ -58,38 +88,17 @@ void ui_display_process_loop(void) {
 }
 
 void ui_handle_action1(uint8_t mode) {
-    // Button 2 pressed
     switch (mode) {
-        case 0:
-            printf("Action 1 in Synth Mode: Changing synth effect...\n");
-            break;
-        case 1:
-            if (sdcard_is_inserted()) {
-                printf("Action 1 in SD Mode: Start/Stop Recording to WAV.\n");
-                // Toggle recording
-                // sdcard_start_recording();
-            }
-            break;
-        case 2:
-            printf("Action 1 in WiFi Mode: Reconnecting ESP...\n");
-            break;
+        case 0: printf("Action 1 Synth Mode\n"); break;
+        case 1: printf("Action 1 SD Mode\n"); break;
+        case 2: printf("Action 1 WiFi Mode\n"); break;
     }
 }
 
 void ui_handle_action2(uint8_t mode) {
-    // Button 3 pressed
     switch (mode) {
-        case 0:
-            printf("Action 2 in Synth Mode: Toggling Audio Output...\n");
-            break;
-        case 1:
-            if (sdcard_is_inserted()) {
-                printf("Action 2 in SD Mode: Playing next WAV from list...\n");
-                // sdcard_play_selected();
-            }
-            break;
-        case 2:
-            printf("Action 2 in WiFi Mode: Sending Test Telemetry...\n");
-            break;
+        case 0: printf("Action 2 Synth Mode\n"); break;
+        case 1: printf("Action 2 SD Mode\n"); break;
+        case 2: printf("Action 2 WiFi Mode\n"); break;
     }
 }
