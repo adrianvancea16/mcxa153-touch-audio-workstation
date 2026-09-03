@@ -1,0 +1,1 @@
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/debug/mcux_config.h
