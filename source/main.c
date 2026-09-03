@@ -24,17 +24,17 @@ typedef enum {
 volatile app_mode_t current_mode = MODE_SYNTHESIZER;
 
 // Button definitions
-#define BOARD_SW1_GPIO GPIO2
-#define BOARD_SW1_PORT PORT2
-#define BOARD_SW1_PIN  2U
+#define APP_SW1_GPIO GPIO2
+#define APP_SW1_PORT PORT2
+#define APP_SW1_PIN  2U
 
-#define BOARD_SW2_GPIO GPIO3
-#define BOARD_SW2_PORT PORT3
-#define BOARD_SW2_PIN  13U
+#define APP_SW2_GPIO GPIO3
+#define APP_SW2_PORT PORT3
+#define APP_SW2_PIN  13U
 
-#define BOARD_SW3_GPIO GPIO3
-#define BOARD_SW3_PORT PORT3
-#define BOARD_SW3_PIN  14U
+#define APP_SW3_GPIO GPIO3
+#define APP_SW3_PORT PORT3
+#define APP_SW3_PIN  14U
 
 // Simple delay function for debounce (to be replaced with timer in production)
 void delay_ms(uint32_t ms) {
@@ -51,7 +51,7 @@ bool sw3_pressed = false;
 
 void check_buttons(void) {
     // Read SW1 (Mode Navigation)
-    if (GPIO_PinRead(BOARD_SW1_GPIO, BOARD_SW1_PIN) == 0) {
+    if (GPIO_PinRead(APP_SW1_GPIO, APP_SW1_PIN) == 0) {
         if (!sw1_pressed) {
             sw1_pressed = true;
             delay_ms(50); // Debounce
@@ -65,7 +65,7 @@ void check_buttons(void) {
     }
 
     // Read SW2 (Action 1)
-    if (GPIO_PinRead(BOARD_SW2_GPIO, BOARD_SW2_PIN) == 0) {
+    if (GPIO_PinRead(APP_SW2_GPIO, APP_SW2_PIN) == 0) {
         if (!sw2_pressed) {
             sw2_pressed = true;
             delay_ms(50); // Debounce
@@ -76,7 +76,7 @@ void check_buttons(void) {
     }
 
     // Read SW3 (Action 2)
-    if (GPIO_PinRead(BOARD_SW3_GPIO, BOARD_SW3_PIN) == 0) {
+    if (GPIO_PinRead(APP_SW3_GPIO, APP_SW3_PIN) == 0) {
         if (!sw3_pressed) {
             sw3_pressed = true;
             delay_ms(50); // Debounce

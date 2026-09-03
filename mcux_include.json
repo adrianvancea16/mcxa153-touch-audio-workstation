@@ -1,0 +1,33 @@
+{
+  "version": 7,
+  "cmakeMinimumRequired": {
+    "major": 3
+  },
+  "configurePresets": [
+    {
+      "name": "debug-env",
+      "displayName": "debug-env",
+      "hidden": true,
+      "environment": {
+        "ARMGCC_DIR": "/home/adrian/.mcuxpressotools/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi",
+        "SdkRootDirPath": "/home/adrian/Facultate/Proiecte/NXP_Summer_School/mcuxsdk",
+        "MCUX_VENV_PATH": "/home/adrian/.mcuxpressotools/.mcux-venv-3.12/bin",
+        "PATH": "$env{MCUX_VENV_PATH}${pathListSep}$penv{PATH}"
+      },
+      "cacheVariables": {}
+    },
+    {
+      "name": "release-env",
+      "displayName": "release-env",
+      "hidden": true,
+      "environment": {
+        "ARMGCC_DIR": "/home/adrian/.mcuxpressotools/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi",
+        "SdkRootDirPath": "/home/adrian/Facultate/Proiecte/NXP_Summer_School/mcuxsdk",
+        "MCUX_VENV_PATH": "/home/adrian/.mcuxpressotools/.mcux-venv-3.12/bin",
+        "PATH": "$env{MCUX_VENV_PATH}${pathListSep}$penv{PATH}"
+      },
+      "cacheVariables": {}
+    }
+  ],
+  "buildPresets": []
+}

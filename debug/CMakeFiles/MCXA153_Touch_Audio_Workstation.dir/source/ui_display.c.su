@@ -1,0 +1,5 @@
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/source/ui_display.c:15:6:ui_display_init	8	static
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/source/ui_display.c:20:6:ui_display_mode	16	static
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/source/ui_display.c:26:6:ui_display_process_loop	8	static
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/source/ui_display.c:60:6:ui_handle_action1	16	static
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/source/ui_display.c:79:6:ui_handle_action2	16	static

@@ -1,0 +1,7 @@
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/source/sdcard_wav.c:6:6:sdcard_wav_init	8	static
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/source/sdcard_wav.c:12:6:sdcard_wav_process_loop	4	static
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/source/sdcard_wav.c:17:6:sdcard_is_inserted	4	static
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/source/sdcard_wav.c:21:6:sdcard_start_recording	8	static
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/source/sdcard_wav.c:25:6:sdcard_stop_recording	8	static
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/source/sdcard_wav.c:29:6:sdcard_play_selected	8	static
+/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/source/sdcard_wav.c:33:6:sdcard_next_file	8	static
