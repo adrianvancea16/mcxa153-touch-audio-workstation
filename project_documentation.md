@@ -9,11 +9,12 @@ This project details the design and implementation of a portable, dual-mode embe
 
 The primary objective is to turn a raw MCU platform into a mixed-signal audio instrument. Audio signals from a preamplified microphone (MAX4466) are sampled via ADC and DMA. The Cortex-M33 core computes real-time Fast Fourier Transforms (FFT) using the ARM CMSIS-DSP library, displaying a 60 FPS graphical spectrum bar graph and oscilloscope waveform on a 2.4-inch ILI9341 SPI TFT LCD Touchscreen. 
 
-The workstation operates in two main firmware modes, selectable via the Touch UI or a wireless web interface:
-1. **Spectrum Analyzer & Recorder Mode:** Renders real-time frequency bar graphs and oscilloscope waveforms. Recorded WAV files are written directly onto the SPI SD Card, utilizing bare-metal FatFS file handling instead of external hardware decoders.
-2. **Touch Synthesizer & Effects Mode:** Renders a graphical piano keyboard and XY modulation pad. The MCU generates digital synthesizer waveforms and applies real-time audio filtering (e.g., reverb, low-pass) directly to the microphone input, outputting the processed signal through the integrated DAC to a 3.5mm headphone jack.
+The workstation operates in three main firmware modes, selectable via 3 hardware tactile buttons (P2_2, P3_13, P3_14) and providing an interactive GUI:
+1. **Synthesizer Mode:** Real-time audio playback in headphones of the sound captured by the microphone with applied DSP effects.
+2. **SD Card Recorder & Player Mode:** Checks if an SD Card is inserted. Records audio into WAV files. Displays a visual list of recordings and allows playing them back directly through headphones.
+3. **ESP Wi-Fi Server Mode:** ESP8266 acts as a local web server for telemetry and remote control via a browser.
 
-An ESP8266 Wi-Fi module operates as a local web server, providing wireless telemetry and remote system control via any browser, while the entire setup operates smoothly via standard USB power.
+The entire setup operates smoothly via standard USB power.
 
 ---
 
@@ -28,7 +29,7 @@ An ESP8266 Wi-Fi module operates as a local web server, providing wireless telem
 - **Operating Environment:** Benchtop laboratory or portable handheld.
 - **Selected Scope:** Recommended Summer School Version (with Core baseline and Advanced Wi-Fi extension).
 - **Main Behavior:** LPADC sampling audio at 40 kHz via DMA, computing 256-point CMSIS-DSP FFTs, rendering 60 FPS spectrum graphs on 2.4" SPI TFT LCD, managing FatFS SD Card recording, synthesizing piano tones and applying audio filters, driving internal DAC audio output, and handling Touch GUI inputs.
-- **Inputs:** MAX4466 mic module, 2.4" resistive touchscreen, Mode Change button (P2_2).
+- **Inputs:** MAX4466 mic module, 2.4" resistive touchscreen, 3 Tactile Buttons (P2_2, P3_13, P3_14).
 - **Outputs:** 2.4" ILI9341 SPI TFT LCD display, internal DAC 3.5mm headphone jack output, ESP8266 UART Wi-Fi stream.
 - **Out-of-Scope Items:** 24-bit multi-track studio recording, high-power speaker driving above 1W, un-isolated 5V logic connections.
 
@@ -101,8 +102,9 @@ flowchart TD
     subgraph Inputs["Analog & User Inputs"]
         MIC[MAX4466 Mic Module] --> ADC
         TOUCH[Resistive Touchscreen] --> SPI
-        BTN1[Button 1: Mode Change] --> MCUCore
-        BTN2[Button 2: RESET] --> MCUCore
+        BTN1[Button 1: P2_2 (Nav / Mode)] --> MCUCore
+        BTN2[Button 2: P3_13 (Action)] --> MCUCore
+        BTN3[Button 3: P3_14 (Action)] --> MCUCore
     end
 
     subgraph DisplayStorage["Display & Storage (SPI Bus)"]
@@ -137,7 +139,7 @@ flowchart TD
 | 3 | MAX4466 Microphone Module | 1 | Core | Acoustic Audio Capture | LPADC Analog Input | 3.3V VCC, ~1.65V DC Bias | Decoupling cap required |
 | 4 | 3.5mm Stereo Audio Jack Breakout | 1 | Recommended | Headphone Audio Out | Analog DAC Output | 0-3.3V Max swing | Requires 1k series resistor |
 | 5 | ESP8266 Wi-Fi Module | 1 | Advanced | Wireless Telemetry & Web UI | LPUART2 (115200 baud) | 3.3V VCC, up to 300mA peak | Decoupling capacitors on power line |
-| 6 | Tactile Buttons | 2 | Core | Mode Toggle / Reset | GPIO Input | 3.3V Pullup | Debounce filtering needed |
+| 6 | Tactile Buttons | 3 | Core | Mode Navigation / Actions | GPIO Input | 3.3V Pullup | Debounce filtering needed |
 | 7 | 1k&Omega; Resistor | 1 | Recommended | DAC protection | In-series | Analog output protection | Limit output current |
 | 8 | 100nF Ceramic Capacitor | 1 | Core | Mic Decoupling | Parallel | Decoupling | Filter noise on mic power |
 
@@ -158,8 +160,9 @@ The hardware centers around the **NXP FRDM-MCXA153** development board. Acoustic
 | SD Card Slot | Recommended | SD_CS | GPIO Output | NXP P1_3 | 3.3V | Output | SPI CS | SPI bus sharing check |
 | 3.5mm Jack | Recommended | DAC_OUT | DAC Output | NXP P3_12 (DAC_OUT) | 0 - 3.3V | Output | Analog | 1k resistor check |
 | ESP8266 Wi-Fi | Advanced | TXD / RXD | LPUART RX / TX | NXP P1_4 / P1_5 (LPUART2) | 3.3V | Bidirectional | UART | Baud rate 115200 |
-| Button 1 | Core | Mode UI | GPIO Input | NXP P2_2 (INPUT_PULLUP) | 3.3V | Input | GPIO | Pullup check |
-| Button 2 | Core | Reset | MCU RESET | RESET Pin | 3.3V | Input | Reset | Hardware reset |
+| Button 1 | Core | Mode Nav / Action | GPIO Input | NXP P2_2 (INPUT_PULLUP) | 3.3V | Input | GPIO | Pullup check |
+| Button 2 | Core | Nav / Action | GPIO Input | NXP P3_13 (INPUT_PULLUP) | 3.3V | Input | GPIO | Pullup check |
+| Button 3 | Core | Nav / Action | GPIO Input | NXP P3_14 (INPUT_PULLUP) | 3.3V | Input | GPIO | Pullup check |
 
 ---
 
@@ -232,13 +235,16 @@ Comunicarea se realizează bidirecțional prin interfața UART (Serial).
 * **RXD (ESP Receive)** $\rightarrow$ **NXP P1_5** (LPUART2_TXD - NXP Transmit)
 
 #### 6. Interfața cu Utilizatorul (Butoane Tactile)
-Butoanele folosesc rezistențele interne Pull-Up ale microcontrolerului.
-* **Buton 1 (Schimbare Mod - UI):**
+Butoanele folosesc rezistențele interne Pull-Up ale microcontrolerului pentru navigarea între moduri și acțiuni.
+* **Buton 1 (Navigare/Acțiune 1):**
   * **Pin 1** $\rightarrow$ Linia de GND
   * **Pin 2** $\rightarrow$ **NXP P2_2** (Configurat software ca INPUT_PULLUP)
-* **Buton 2 (Resetare Sistem):**
+* **Buton 2 (Navigare/Acțiune 2):**
   * **Pin 1** $\rightarrow$ Linia de GND
-  * **Pin 2** $\rightarrow$ **NXP RESET**
+  * **Pin 2** $\rightarrow$ **NXP P3_13** (Configurat software ca INPUT_PULLUP)
+* **Buton 3 (Navigare/Acțiune 3):**
+  * **Pin 1** $\rightarrow$ Linia de GND
+  * **Pin 2** $\rightarrow$ **NXP P3_14** (Configurat software ca INPUT_PULLUP)
 
 ---
 
