@@ -1,0 +1,6 @@
+# CMake/Ninja build output directories (regenerated via `cmake --preset debug`
+# or `cmake --preset release`, then `cmake --build <dir>`) -- machine-specific
+# (absolute toolchain/SDK paths) and fully derivable from source, so they
+# don't belong in version control.
+/debug/
+/release/

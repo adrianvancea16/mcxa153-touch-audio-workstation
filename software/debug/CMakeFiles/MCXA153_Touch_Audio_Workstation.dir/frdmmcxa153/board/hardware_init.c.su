@@ -1,2 +1,0 @@
-/home/adrian/Facultate/Proiecte/NXP_Summer_School/mcuxsdk/mcuxsdk/drivers/gpio/fsl_gpio.h:346:20:GPIO_PinWrite	24	static
-/home/adrian/Facultate/Proiecte/NXP_Summer_School/Proiect/frdmmcxa153/board/hardware_init.c:18:6:BOARD_InitHardware	8	static
