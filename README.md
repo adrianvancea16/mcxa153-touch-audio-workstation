@@ -414,6 +414,7 @@ TODO: Add links or attach:
 |---|---|---|---|---|
 | 2026-07-20 | Initial project scoping and requirements engineering package created | SPI bus sharing risk identified | Set up MCUXpresso Config Tools for pins and clocks | Vancea Adrian |
 | 2026-08-23 | Milestone 2 completed: electrical schematics generated, breadboard assembly done, connection mapping documented | SPI shared bus contention risk | Proceed with bare-metal firmware implementation | Vancea Adrian |
+| 2026-09-03 | Firmware rewrite: real FFT-driven Synthesizer mode with selectable voice filters, real SD card recording/playback (FatFS), real WiFi/ESP8266 status+file server, mic quality pass (AGC, anti-alias, 2nd-order noise-shaped output). See section 14 for hardware-relevant caveats this work surfaced. | See section 14 | Wire an RC filter on the audio output pin; verify LPUART2 pin-mux ALT value on real hardware | Claude (AI pair-programmer) |
 
 ---
 
@@ -436,3 +437,16 @@ TODO: Add links or attach:
 ## 13. Documentation Status
 
 **MILESTONE 2 COMPLETED & READY FOR FIRMWARE DEVELOPMENT**
+
+---
+
+## 14. Implementation Notes (Firmware v2, 2026-09-03)
+
+Things the firmware work in `software/source/` surfaced that update or correct earlier assumptions in this document:
+
+- **No hardware DAC.** The pin table above lists a `DAC_OUT` function on `P3_12`, but the MCXA153's own register headers confirm this chip has **no general-purpose audio DAC peripheral** (only an internal comparator reference, unusable for audio). Audio output stays a 1-bit noise-shaped bitstream on `P3_12` (software delta-sigma modulator, 2nd order, ~192kHz), same pin as before.
+- **RC low-pass filter required on the audio output line.** A raw 1-bit bitstream driven straight into the 3.5mm jack is the most likely reason the earlier build "sounded bad." Add a simple RC low-pass between `P3_12` and the jack (~1kΩ in series + ~15-22nF to GND, cutoff around 10-15kHz) before judging audio quality on real hardware.
+- **SD card is bit-banged SPI, not the LPSPI0 hardware peripheral.** It shares the LCD's existing SCK/MOSI pins (`P2_12`/`P2_13`) and adds MISO (`P2_16`) and its own CS (`P1_3`, as already documented above). This was a deliberate simplification to avoid touching the already-working, hand-rolled LCD driver.
+- **No Card-Detect pin exists on this wiring**, so "SD card present" is determined purely by whether `f_mount()` succeeds — this is re-attempted whenever the SD Recorder screen is opened.
+- **ESP8266 pin mux (P1_4/P1_5 → LPUART2) needs a hardware check.** The exact ALT function index used in firmware (`ALT4` on P1_4, `ALT3` on P1_5) is our best reading of the MCXA153 pin-signal table, not confirmed against a working link yet — re-check with the MCUXpresso Config Tool / reference manual if the ESP8266 doesn't respond to `AT`.
+- **FFT is a small self-contained radix-2 implementation** in `audio_engine.c`, not the CMSIS-DSP library mentioned in section 12 — this avoided pulling in and configuring a large external DSP component for a 256-point transform that's cheap to hand-roll.

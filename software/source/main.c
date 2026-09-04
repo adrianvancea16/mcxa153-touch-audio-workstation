@@ -6,24 +6,23 @@
 #include "clock_config.h"
 #include "fsl_gpio.h"
 #include "fsl_port.h"
+#include "fsl_reset.h"
+#include "fsl_common.h"
 
-// Includes for project modules
 #include "ui_display.h"
-#include "audio_dsp.h"
+#include "audio_engine.h"
 #include "sdcard_wav.h"
 #include "wifi_esp.h"
 
-// Define the 3 modes
 typedef enum {
-    MODE_SYNTHESIZER = 0,
-    MODE_SD_RECORDER_PLAYER = 1,
-    MODE_ESP_WIFI = 2,
+    MODE_SYNTH = 0,
+    MODE_SD = 1,
+    MODE_WIFI = 2,
     MODE_COUNT
 } app_mode_t;
 
-volatile app_mode_t current_mode = MODE_SYNTHESIZER;
+volatile app_mode_t current_mode = MODE_SYNTH;
 
-// Button definitions
 #define APP_SW1_GPIO GPIO2
 #define APP_SW1_PORT PORT2
 #define APP_SW1_PIN  2U
@@ -36,95 +35,82 @@ volatile app_mode_t current_mode = MODE_SYNTHESIZER;
 #define APP_SW3_PORT PORT3
 #define APP_SW3_PIN  14U
 
-// Simple delay function for debounce (to be replaced with timer in production)
-void delay_ms(uint32_t ms) {
-    uint32_t loops = ms * (SystemCoreClock / 10000); // Approximate
-    while (loops--) {
-        __NOP();
-    }
-}
-
-// Button state tracking
 bool sw1_pressed = false;
 bool sw2_pressed = false;
 bool sw3_pressed = false;
 
 void check_buttons(void) {
-    // Read SW1 (Mode Navigation)
+    
+
     if (GPIO_PinRead(APP_SW1_GPIO, APP_SW1_PIN) == 0) {
+        
         if (!sw1_pressed) {
             sw1_pressed = true;
-            delay_ms(50); // Debounce
-            
-            // Navigate to next mode
+            SDK_DelayAtLeastUs(50000U, SystemCoreClock); // debounce
             current_mode = (app_mode_t)((current_mode + 1) % MODE_COUNT);
             ui_display_mode(current_mode);
         }
-    } else {
-        sw1_pressed = false;
-    }
+    } else { sw1_pressed = false; }
 
-    // Read SW2 (Action 1)
     if (GPIO_PinRead(APP_SW2_GPIO, APP_SW2_PIN) == 0) {
+        
         if (!sw2_pressed) {
             sw2_pressed = true;
-            delay_ms(50); // Debounce
+            SDK_DelayAtLeastUs(50000U, SystemCoreClock);
             ui_handle_action1(current_mode);
         }
-    } else {
-        sw2_pressed = false;
-    }
+    } else { sw2_pressed = false; }
 
-    // Read SW3 (Action 2)
     if (GPIO_PinRead(APP_SW3_GPIO, APP_SW3_PIN) == 0) {
+        
         if (!sw3_pressed) {
             sw3_pressed = true;
-            delay_ms(50); // Debounce
+            SDK_DelayAtLeastUs(50000U, SystemCoreClock);
             ui_handle_action2(current_mode);
         }
-    } else {
-        sw3_pressed = false;
-    }
+    } else { sw3_pressed = false; }
+    
+    // Draw visual feedback for buttons on the top right
 }
 
 int main(void) {
-    // Board Initialization
     BOARD_InitBootPins();
     BOARD_InitBootClocks();
     BOARD_InitDebugConsole();
 
-    printf("Starting NXP Audio Workstation...\n");
+    CLOCK_EnableClock(kCLOCK_GatePORT1); CLOCK_EnableClock(kCLOCK_GateGPIO1);
+    CLOCK_EnableClock(kCLOCK_GatePORT2); CLOCK_EnableClock(kCLOCK_GateGPIO2);
+    CLOCK_EnableClock(kCLOCK_GatePORT3); CLOCK_EnableClock(kCLOCK_GateGPIO3);
 
-    // Initialize subsystems
+    RESET_ReleasePeripheralReset(kPORT1_RST_SHIFT_RSTn); RESET_ReleasePeripheralReset(kGPIO1_RST_SHIFT_RSTn);
+    RESET_ReleasePeripheralReset(kPORT2_RST_SHIFT_RSTn); RESET_ReleasePeripheralReset(kGPIO2_RST_SHIFT_RSTn);
+    RESET_ReleasePeripheralReset(kPORT3_RST_SHIFT_RSTn); RESET_ReleasePeripheralReset(kGPIO3_RST_SHIFT_RSTn);
+
+    gpio_pin_config_t in_config = {kGPIO_DigitalInput, 0};
+    port_pin_config_t pull_up = {0};
+    pull_up.pullSelect = kPORT_PullUp;
+    pull_up.mux = kPORT_MuxAlt0;
+    // CRITICAL FIX: The Input Buffer must be enabled for GPIO_PinRead to work on MCXA!
+    pull_up.inputBuffer = kPORT_InputBufferEnable; 
+    
+    PORT_SetPinConfig(PORT2, 2U, &pull_up); GPIO_PinInit(GPIO2, 2U, &in_config);
+    PORT_SetPinConfig(PORT3, 13U, &pull_up); GPIO_PinInit(GPIO3, 13U, &in_config);
+    PORT_SetPinConfig(PORT3, 14U, &pull_up); GPIO_PinInit(GPIO3, 14U, &in_config);
+
+    printf("Starting Proper Audio Workstation...\n");
     ui_display_init();
-    audio_dsp_init();
+    AudioEngine_Init();
     sdcard_wav_init();
     wifi_esp_init();
 
-    // Show initial mode
     ui_display_mode(current_mode);
 
     while (1) {
-        // Poll buttons for navigation and actions
         check_buttons();
-
-        // Run mode-specific background tasks
-        switch (current_mode) {
-            case MODE_SYNTHESIZER:
-                audio_dsp_process_loop();
-                break;
-            case MODE_SD_RECORDER_PLAYER:
-                sdcard_wav_process_loop();
-                break;
-            case MODE_ESP_WIFI:
-                wifi_esp_process_loop();
-                break;
-            default:
-                break;
-        }
-
-        // Run UI update loop
         ui_display_process_loop();
+        AudioEngine_Process();
+        sdcard_wav_process_loop();
+        wifi_esp_process_loop();
     }
     return 0;
 }

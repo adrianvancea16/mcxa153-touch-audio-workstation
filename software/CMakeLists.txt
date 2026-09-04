@@ -16,10 +16,17 @@ include(${board}/board_files.cmake)
 
 mcux_add_source(
     SOURCES source/main.c
+    source/audio_engine.c
+    source/fsl_lpadc.c
+    source/fsl_ctimer.c
             source/ui_display.c
-            source/audio_dsp.c
             source/sdcard_wav.c
             source/wifi_esp.c
+            source/diskio.c
+            source/ff.c
+            source/ffsystem.c
+            source/ffunicode.c
+            source/fsl_lpspi.c
 )
 
 mcux_add_source(
