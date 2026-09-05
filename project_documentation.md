@@ -381,10 +381,39 @@ During Milestone 2, the physical circuit hardware was successfully connected and
 - **Hardware Montaj:** The circuit is fully assembled on a standard breadboard using the FRDM-MCXA153 and custom breakouts.
 - **Power Delivery:** System boots reliably using standard USB power.
 - **Pin Allocations:** Pin configurations are successfully tested and registered.
+- **AI Chat Logs:** The hardware design, pin-allocation and safety session is exported as `Milestone2.json` (JSON chat-log export, uploaded to the platform).
 
 ---
 
-## 9. Conclusions
+## 9. Running Examples & Functional Results (Milestone 3)
+
+Milestone 3 delivers the full application firmware (see `software/source/`) running on the assembled hardware from Milestone 2. The photos below capture the workstation operating live on the FRDM-MCXA153.
+
+### 9.1 Application Code
+- **Firmware modules:** `audio_engine.c/.h` (mic sampling, self-contained radix-2 256-point FFT, DDS synth, 2nd-order delta-sigma audio output), `ui_display.c/.h` (ILI9341 driver + screen rendering), `sdcard_wav.c/.h` (FatFS WAV record/playback over bit-banged SPI), `wifi_esp.c/.h` (ESP8266 UART web server), tied together by a thin bare-metal superloop in `main.c`.
+- **Build:** MCUXpresso SDK + CMake/Ninja, GNU Arm Embedded 14.2. The project compiles and links cleanly to the target ELF.
+
+### 9.2 Spectrum Analyzer Mode (Live)
+![Milestone 3 - Spectrum Analyzer running on hardware](./Poza1_functionalitate.jpg)
+
+The full breadboard assembly powered and running: the MAX4466 microphone feeds the LPADC, the firmware computes a 256-point FFT, and the ILI9341 renders the **SPECTRUM** screen — a live 32-band FFT bar spectrum with peak-hold, an oscilloscope pane, and on-screen touch controls (**MODE / REC / SYNTH**). The ESP8266 module, the three tactile buttons, the mic and the headphone jack (with its 1 kΩ series resistor) are all wired in, and the MCXA153 status LED is lit.
+
+### 9.3 Spectrum / Oscilloscope UI Close-Up
+![Milestone 3 - SPECTRUM screen close-up](./Poza3_functionalitate.jpg)
+
+Close-up of the running GUI showing live measurements read from the audio engine: **Peak: 780 Hz**, **Vpp: 323 mV**, **DC: 0.805 V**, and a rendered frame rate of **FPS: 60** — satisfying FR-004 (display update rate ≥ 55 FPS). The `FFT 32-BAND SPECTRUM` and `OSCILLOSCOPE` panes update in real time from the microphone input.
+
+### 9.4 Display Bring-Up / Test Pattern
+![Milestone 3 - ILI9341 display test pattern](./Poza2_test.jpg)
+
+Hardware test shot: the ILI9341 driver rendering a full RGB colour-bar test pattern, used during display bring-up to verify the SPI wiring, colour order and address-window logic before layering the UI on top.
+
+### 9.5 AI Chat Logs (Milestone 3)
+The AI pair-programming session covering the firmware module decomposition, the hand-rolled FFT, and the iterative hardware debugging (no on-chip DAC → delta-sigma output + RC filter, mic AGC/anti-alias, bit-banged SD, ESP8266 pin-mux caveat) is exported as `Milestone3.json` (JSON chat-log export, uploaded to the platform).
+
+---
+
+## 10. Conclusions
 
 ```markdown
 TODO: Complete at the end of the project.
@@ -392,7 +421,7 @@ TODO: Complete at the end of the project.
 
 ---
 
-## 10. Download
+## 11. Download
 
 ```markdown
 TODO: Add links or attach:
@@ -408,16 +437,17 @@ TODO: Add links or attach:
 
 ---
 
-## 11. Project Journal
+## 12. Project Journal
 
 | Date | Work Completed | Problems / Risks | Next Steps | Author |
 |---|---|---|---|---|
 | 2026-07-20 | Initial project scoping and requirements engineering package created | SPI bus sharing risk identified | Set up MCUXpresso Config Tools for pins and clocks | Vancea Adrian |
-| 2026-08-23 | Milestone 2 completed: electrical schematics generated, breadboard assembly done, connection mapping documented | SPI shared bus contention risk | Proceed with bare-metal firmware implementation | Vancea Adrian |
+| 2026-08-23 | Milestone 2 completed: electrical schematics generated, breadboard assembly done, connection mapping documented; hardware AI chat log exported (`Milestone2.json`) | SPI shared bus contention risk | Proceed with bare-metal firmware implementation | Vancea Adrian |
+| 2026-09-05 | Milestone 3 completed: full application firmware implemented (FFT spectrum analyzer, synth, SD recorder, Wi-Fi), verified live on hardware (SPECTRUM screen @ 60 FPS, Peak 780 Hz); functionality photos added; firmware AI chat log exported (`Milestone3.json`) | RC audio filter + ESP8266 pin-mux ALT still to confirm on hardware | Finalize documentation, wire audio-output RC filter, verify LPUART2 ALT values | Vancea Adrian |
 
 ---
 
-## 12. Bibliography / Resources
+## 13. Bibliography / Resources
 
 ### Hardware Resources
 - NXP FRDM-MCXA153 User Manual & Board Schematics
@@ -433,6 +463,6 @@ TODO: Add links or attach:
 
 ---
 
-## 13. Documentation Status
+## 14. Documentation Status
 
-**MILESTONE 2 COMPLETED & READY FOR FIRMWARE DEVELOPMENT**
+**MILESTONE 3 COMPLETED — APPLICATION FIRMWARE IMPLEMENTED & VERIFIED LIVE ON HARDWARE**
