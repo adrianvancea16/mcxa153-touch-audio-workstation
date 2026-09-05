@@ -102,9 +102,9 @@ flowchart TD
     subgraph Inputs["Analog & User Inputs"]
         MIC[MAX4466 Mic Module] --> ADC
         TOUCH[Resistive Touchscreen] --> SPI
-        BTN1[Button 1: P2_2 (Nav / Mode)] --> MCUCore
-        BTN2[Button 2: P3_13 (Action)] --> MCUCore
-        BTN3[Button 3: P3_14 (Action)] --> MCUCore
+        BTN1["Button 1: P2_2 (Nav / Mode)"] --> MCUCore
+        BTN2["Button 2: P3_13 (Action)"] --> MCUCore
+        BTN3["Button 3: P3_14 (Action)"] --> MCUCore
     end
 
     subgraph DisplayStorage["Display & Storage (SPI Bus)"]

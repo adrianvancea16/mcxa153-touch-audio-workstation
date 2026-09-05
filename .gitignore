@@ -1,1 +1,5 @@
 .agents/
+
+# AI chat log exports (kept local, not tracked)
+Milestone2.json
+Milestone3.json
