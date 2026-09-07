@@ -391,7 +391,9 @@ During Milestone 2, the physical circuit hardware was successfully connected and
 
 Milestone 3 delivers the full application firmware (see `software/source/`) running on the assembled hardware from Milestone 2. The photos below capture the workstation operating live on the FRDM-MCXA153.
 
-> **Note:** the screenshot in 9.3 is from an earlier firmware/UI revision (32-band spectrum + a separate oscilloscope pane, blue theme, combined REC/SYNTH screen) — kept here as real evidence the hardware and display path work end-to-end. The current firmware described in sections 1-4 and 15 has since been redesigned: 3 separate mode screens (Synthesizer/SD Recorder/Wi-Fi Server), a 16-band dB-scaled spectrum with peak-hold, no oscilloscope pane, and a dark navy/cyan dashboard theme.
+> **Which photos show which revision.** Sections **9.2–9.4** are from an earlier firmware/UI revision (32-band spectrum plus a separate oscilloscope pane, combined REC/SYNTH screen) — kept as evidence that the hardware and display path work end-to-end. Sections **9.5–9.8** show the **current** firmware: three separate mode screens (Synthesizer / SD Recorder / Wi-Fi Server), a 16-band spectrum with peak-hold and a labelled frequency axis, an input level meter, and the web dashboard.
+>
+> The Synthesizer screen is fully live in every build. The SD and Wi-Fi screens in 9.6–9.8 were photographed on a `DEMO_MODE` build and carry an on-screen amber label saying so — see **section 16** for exactly what that substitutes and what it leaves untouched.
 
 ### 9.1 Application Code
 - **Firmware modules:** `audio_engine.c/.h` (mic sampling, self-contained radix-2 256-point FFT, selectable voice effects, software PDM audio output), `ui_display.c/.h` (ILI9341 driver + screen rendering), `sdcard_wav.c/.h` (FatFS WAV record/playback over bit-banged SPI), `wifi_esp.c/.h` (ESP8266 UART web server), tied together by a thin bare-metal superloop in `main.c`.
@@ -412,7 +414,49 @@ Close-up of the running GUI showing live measurements read from the audio engine
 
 Hardware test shot: the ILI9341 driver rendering a full RGB colour-bar test pattern, used during display bring-up to verify the SPI wiring, colour order and address-window logic before layering the UI on top.
 
-### 9.5 AI Chat Logs (Milestone 3)
+### 9.5 Synthesizer Mode — Current UI
+
+![Synthesizer screen running on hardware](./Poza_syntetizator_1.jpg)
+
+The redesigned Synthesizer screen on the ILI9341, photographed on the running board. Top to bottom: the title card with the active voice effect (`filter: OFF`), the horizontal **input level meter**, and the spectrum well — 16 bands with white peak-hold caps, amplitude ticks on both margins and the frequency axis labelled **0 / 2k / 4k / 6k / 8k** (Nyquist is 8 kHz at 16 kHz sampling). The footer maps the three tactile buttons to **MODE / FILTER / FREEZE**. Everything on this screen is measured from the microphone in real time — this mode uses no simulated data in any build.
+
+Also visible: the FRDM-MCXA153, the ESP8266 module, the MAX4466 microphone, the three buttons and the RC-filtered headphone jack, all on the Milestone 2 breadboard.
+
+![Synthesizer screen with the level meter in its red zone](./Poza_syntetizator_2.jpg)
+
+The same screen at a louder input. The level meter has crossed into its red zone and switched from cyan to coral, and the spectrum shows the expected low-frequency-dominant roll-off of a speaking voice with the peak-hold caps trailing above the live bars.
+
+### 9.6 SD Recorder Mode
+
+![SD Recorder screen, playback state](./Poza_redare_audio.jpg)
+
+The SD Recorder screen during playback: card status **DETECTED**, free space, the **PLAYING** state and the selected file `REC0001.WAV`, with the buttons mapped to **MODE / REC / PLAY**. The amber `demo - simulated card` line under the title marks that this build reports a simulated card — see section 16.
+
+![Full system with headphones connected](./Poza_sistem.jpg)
+
+The complete workstation: MCU, breadboard, ESP8266, microphone, display and headphones connected to the RC-filtered PDM output. The recorder screen is in its **READY** state showing the selected recording and its position in the list (`1 / 3`).
+
+### 9.7 Wi-Fi Server Mode
+
+![Wi-Fi Server screen](./Poza_server.jpg)
+
+The Wi-Fi Server screen reporting the access point details the firmware configures — `ssid: MCXA153-AudioWS`, `ip: 192.168.4.1`, `state: AP UP` — plus a served-request counter, with the buttons mapped to **MODE / RESTART / LEVEL**. The amber `demo - simulated link` line marks the simulated state.
+
+### 9.8 Web Dashboard (Bench Monitor)
+
+![Bench Monitor dashboard](./ScreenShot_Site.png)
+
+`software/tools/dashboard.html` rendered in a browser. It mirrors the device: the same 16 spectrum bands with peak-hold, the input level, the active voice effect, and the recorder state with the recordings list and per-file download links. Hovering a band shows its exact range and magnitude — here **2500–3000 Hz, magnitude 52 / 255, peak 148**. The **CHART / TABLE** control switches to a tabular view of the same 16 bands so the data is not conveyed by the chart alone.
+
+![Dashboard, recorder detail](./Poza_recordings.png)
+
+Recorder detail: elapsed time, remaining space, the fixed 31.25 kB/s write rate of this WAV format, and the three recordings each offering a direct `GET /download?file=` link.
+
+![Dashboard next to the running board](./Poza_site.jpg)
+
+The dashboard open on a laptop beside the workstation. See section 16.1 for what the page reads when the board is and is not reachable.
+
+### 9.9 AI Chat Logs (Milestone 3)
 The AI pair-programming session covering the firmware module decomposition, the hand-rolled FFT, and the iterative hardware debugging (no on-chip DAC → delta-sigma output + RC filter, mic AGC/anti-alias, bit-banged SD, ESP8266 pin-mux caveat) is exported as `Milestone3.json` (JSON chat-log export, uploaded to the platform).
 
 ---
@@ -480,8 +524,113 @@ Details and caveats not worth cluttering the main spec above, but worth keeping 
 
 - **SD card is bit-banged SPI, not the LPSPI0 hardware peripheral.** It shares the LCD's existing SCK/MOSI pins (`P2_12`/`P2_13`) and adds MISO (`P2_16`) and its own CS (`P1_3`, already documented in section 3.3). This was a deliberate simplification to avoid touching the already-working, hand-rolled LCD driver.
 - **No Card-Detect pin exists on this wiring**, so "SD card present" is determined purely by whether `f_mount()` succeeds — re-attempted whenever the SD Recorder screen is opened.
-- **ESP8266 pin mux (P1_4/P1_5 → LPUART2) needs a hardware check** (tracked as Q-002 above) — the exact ALT function index used in firmware is our best reading of the MCXA153 pin-signal table, not confirmed against a working link yet.
+- **ESP8266 pin mux (P1_4/P1_5 → LPUART2) is now `kPORT_MuxAlt3` on both pins** (was Q-002). The firmware previously used ALT4 on P1_4, which on that pin is `CT1_MAT2` — a CTIMER1 match *output*, so the MCU was driving the line the ESP8266 transmits on and could never receive a byte. The value is anchored to SDK-generated `pin_mux.c` files that mux these exact pins (`ctimer/simple_pwm` sets CT1_MAT2 on P1_4 to ALT4; `freqme` sets FREQME_CLK_IN1 on P1_5 to ALT1). Note the slash-separated `pin_signal` strings are *not* a dense mux table — `WUU0_INx` entries are wake-up inputs and consume no ALT slot. Fixed but **not yet confirmed against a working link on hardware**.
+- **The Wi-Fi HTTP responses carry `Access-Control-Allow-Origin: *`**, without which a browser page served from anywhere else is refused before it can read the JSON.
 - **Audio output modulator history:** a 2nd-order noise-shaped modulator was tried for better theoretical SNR, but at the oversampling ratio in use it produced an audible, input-independent tone (a known failure mode for higher-order 1-bit modulators at low oversampling) and was reverted to the original, simple 1st-order accumulator, which is unconditionally stable at any rate. The carrier rate has since been raised well beyond the original design specifically to give the external RC filter more room to attenuate it.
 - **Real-time audio lives in the SysTick ISR, not the main loop.** An earlier version deferred per-sample processing to the main loop via a flag, matching a simpler design — that broke down once the LCD had real content to redraw (bit-banged SPI can block the main loop for tens of milliseconds), causing audible periodic clicks. Only the FFT transform itself (not needed in real time) still runs in the main loop.
 - **Voice effects are not yet applied during SD playback** (tracked as Q-003 above) — currently they only affect the live Synthesizer path.
 - **FFT is a small self-contained radix-2 implementation** in `audio_engine.c`, not an external DSP library — a 256-point transform is cheap enough to hand-roll and this avoided pulling in and configuring a large external component.
+
+---
+
+## 16. Demonstration Mode (`DEMO_MODE`)
+
+The SD recorder and the Wi-Fi link are still being brought up on hardware. So the
+firmware ships a presentation build, switched by a single constant in
+`software/source/demo_mode.h`, that lets the board be demonstrated and
+photographed with those two screens populated:
+
+```c
+#define DEMO_MODE 1   /* 0 = normal build, real peripherals only */
+```
+
+**What it substitutes.** With `DEMO_MODE` on, `sdcard_*` reports a mounted 2 GB
+card and `wifi_esp_get_state()` reports `AP UP`. The simulated card behaves the
+way a real one would: the elapsed clock runs while recording, free space ticks
+down at this WAV format's true 31.25 kB/s, and stopping a take adds a file to
+the list. `/files` mirrors that same simulated list, so the web view and the LCD
+never disagree about which recordings exist.
+
+**What it does not touch.** `diskio.c`, the FatFS file I/O in `sdcard_wav.c` and
+the ESP8266 AT state machine are all untouched — the state machine keeps running
+underneath, so a module that does come up serves real requests. The substitution
+happens only at the status-query boundary the UI reads, and building with
+`DEMO_MODE 0` restores the real behaviour exactly. Both configurations compile
+clean.
+
+**How it is labelled.** Both affected screens carry an amber
+`demo - simulated card` / `demo - simulated link` line under the title, and the
+HTML dashboard shows a `DEMO` lamp reading `simulated signal` whenever it is not
+actually talking to the board.
+
+> **Any photograph taken from a `DEMO_MODE 1` build shows simulated SD and Wi-Fi
+> state, not working hardware.** The Synthesizer screen is unaffected — its
+> spectrum, level meter and audio path are real in every build.
+
+### 16.1 Bench Monitor (web dashboard)
+
+`software/tools/dashboard.html` is a standalone page — open it directly in a
+browser, no server needed. Joined to the board's access point it polls
+`http://192.168.4.1/status` (5 Hz) and `/files`, and renders the same 16 bands
+the LCD draws, the input level, recorder state and the file list with download
+links. When the board is unreachable it renders a placeholder signal instead, so
+the layout can still be reviewed.
+
+> **The dashboard screenshots in this repository are a finished-state UI
+> preview, not a captured measurement session.** A hosted copy of the page
+> cannot reach a device on your own network, so it always shows the placeholder
+> signal; only the standalone file, opened while joined to the access point,
+> reads the board.
+
+`/status` was also corrected to send the 16 **aggregated** bands rather than the
+first 16 raw FFT bins — which had been only the bottom ~1 kHz of an 8 kHz
+spectrum — and now includes `rec_ms`.
+
+### 16.2 Real-path changes made alongside the demo build
+
+These are fixes to the **actual** implementation, active with `DEMO_MODE` either
+way:
+
+- **Record ring buffer 512 → 2048 samples** (`audio_engine.h`). The producer
+  side runs in the SysTick ISR and cannot wait, so the buffer has to cover the
+  longest pause the main loop can take. Two stalls dominate: an SD card can
+  disappear for 100 ms+ doing internal housekeeping mid-write, and `wifi_esp.c`
+  transmits with `LPUART_WriteBlocking`, which parks the loop for ~27 ms per
+  ~310-byte `/status` reply. The old 512 samples was 32 ms of headroom, so
+  recording while a browser polled the board dropped audio. 2048 gives 128 ms.
+  4096 (256 ms) was measured first and is the nicer number, but with
+  `DEMO_MODE 0` it left only ~700 bytes of SRAM once the 2 KB stack and 1 KB
+  heap are placed. **RAM, not the audio, is what caps this** — the real build
+  now sits at 19.7 KB of 24 KB including stack and heap.
+- **Free space is cached** (`sdcard_wav.c`). `f_getfree()` is not cheap: FatFS
+  keeps a free-cluster count but every write invalidates it, and the next call
+  walks the whole FAT — seconds, over bit-banged SPI on a 2 GB card. That value
+  is read by the recorder screen *and* by every `/status` request, so uncached
+  it would rescan the FAT on each poll, exactly while recording is writing. It
+  is now refreshed on mount and when a recording closes; in between, the bytes
+  the open file has written are subtracted, which is exact for fixed-rate PCM.
+- **Dashboard polls at 1 Hz, not 5 Hz.** A `/status` reply is ~310 bytes; at
+  115200 baud that is ~27 ms of shifting on its own, and every reply also costs
+  an `AT+CIPSEND` handshake, a `SEND OK` and an `AT+CIPCLOSE` round trip.
+  Polling harder than the link can answer only queues requests.
+
+### 16.3 Known ceilings
+
+Measured, not estimated — from the linked ELF:
+
+- **The MCU has no FPU** (`-mfloat-abi=soft`); every float operation is a
+  library call. `__aeabi_fmul` is 116 instructions, `__addsf3` is 120. The
+  per-sample audio path makes **20 such calls**.
+- **SysTick fires every 100 cycles** (96 MHz core, 960 kHz PDM carrier), and the
+  per-sample work is roughly **2,100 instructions** — so it spills across many
+  tick periods and the 960 kHz carrier is not actually held.
+- The project currently builds at **`-O0`** on all 31 translation units, even
+  though a `release` preset exists. Building optimised is the single largest
+  available improvement and costs nothing.
+- Converting the biquad and the level smoothing to **fixed-point** would remove
+  those 20 library calls per sample without trading away carrier frequency
+  (lowering the carrier would free more CPU, but it was deliberately raised
+  192 k → 384 k → 960 k to move the tone out of the RC filter's passband).
+- **WAV download over the AT link is slow by construction**: 512-byte chunks,
+  each with a full `AT+CIPSEND` handshake. A 10-second recording is ~320 KB
+  ≈ 640 chunks ≈ 1–2 minutes. Practical for short clips only.
