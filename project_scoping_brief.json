@@ -1,4 +1,9 @@
 {
+  "documentation_status": {
+    "superseded": true,
+    "superseded_date": "2026-09-07",
+    "note": "This is the initial scoping brief from before implementation. The touchscreen piano/XY-pad synth mode and the internal DAC output described below were dropped once real hardware testing began (this MCU has no audio DAC) and replaced with a voice synthesizer + SD recorder + Wi-Fi server design. See the repository README.md for the current, accurate project description."
+  },
   "agent": {
     "name": "Embedded Project Idea Scoping Agent",
     "version": "2.2",

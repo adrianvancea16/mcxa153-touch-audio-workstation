@@ -1,1 +1,7 @@
 .agents/
+
+# Leftover/CMake build output directories (see software/.gitignore for the
+# current build dir location under software/debug, software/release)
+/debug/
+/release/
+
