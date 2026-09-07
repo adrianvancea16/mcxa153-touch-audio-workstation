@@ -18,7 +18,9 @@
         "set non-stop off"
       ],
       "gdbServerConfigs": {
-        "linkserver": {},
+        "linkserver": {
+          "device": "MCXA153:FRDM-MCXA153"
+        },
         "segger": {},
         "pemicro": {}
       },
