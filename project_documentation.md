@@ -351,7 +351,7 @@ Bare-metal superloop, with the audio-critical path moved into a hardware timer i
 | ID | Question | Why It Matters | Owner | Status |
 |---|---|---|---|---|
 | Q-001 | Does concurrent SD Card writing cause audio glitching or frame drops? | Affects output stability in Recorder mode | Student / Instructor | Open |
-| Q-002 | Is the LPUART2 PORT mux ALT index used for P1_4/P1_5 (RXD=ALT4, TXD=ALT3) actually correct on this silicon? | ESP8266 link won't come up otherwise | Student / Instructor | Open — not yet confirmed against a working link |
+| Q-002 | Is the LPUART2 PORT mux ALT index for P1_4/P1_5 correct on this silicon? | ESP8266 link won't come up otherwise | Student / Instructor | **Resolved in code** — both pins are ALT3; the previous ALT4 on P1_4 was CT1_MAT2, a timer output. See section 15. Not yet confirmed against a working link. |
 | Q-003 | Should voice effects apply during SD playback, not just live Synthesizer mode? | Matches the intended user experience | Student | Open — not yet implemented |
 
 ---
@@ -463,25 +463,98 @@ The AI pair-programming session covering the firmware module decomposition, the 
 
 ## 10. Conclusions
 
-```markdown
-TODO: Complete at the end of the project.
-```
+The project delivers a three-mode bare-metal audio workstation on the
+FRDM-MCXA153: a live voice synthesizer with a real-time spectrum display, an
+SD-card WAV recorder/player, and an ESP8266 access point serving status and
+recordings over HTTP. All three are navigated with three tactile buttons and
+share one bit-banged SPI bus.
+
+**What is verified on hardware.** Synthesizer mode works end to end — the
+microphone is audible and intelligible through the headphone jack, the
+256-point FFT drives a 16-band spectrum with peak-hold, and the redesigned
+screen (level meter, spectrum well, labelled frequency axis) is photographed
+running in section 9.5. This mode uses no simulated data in any build.
+
+**What is implemented but not yet confirmed.** The SD and Wi-Fi paths are
+written and build clean, and two root causes that had blocked them were found
+and fixed late in the project — the LPUART2 pin mux on P1_4 pointed at a timer
+output rather than the UART receiver, and the SD bus was clocked far outside
+the identification-phase limit. Neither fix has been exercised against the
+hardware yet; sections 15 and 16 say so explicitly rather than implying
+otherwise.
+
+**The findings worth carrying forward.** Three constraints shaped the
+implementation more than any design choice did:
+
+1. **The MCU has no audio DAC.** Headphone output is a software 1-bit PDM
+   bitstream on a GPIO pin, and it is only listenable because of the external
+   RC filter. A higher-order noise-shaped modulator was tried and reverted —
+   at this oversampling ratio it produced an input-independent tone.
+2. **The MCU has no FPU.** Every float operation in the audio path is a
+   library call; `__aeabi_fmul` alone is 116 instructions, and the per-sample
+   path makes twenty such calls. That, not the algorithm, is what consumes the
+   cycle budget.
+3. **RAM, not CPU, caps the buffering.** The record ring wants to be as large
+   as possible to absorb SD and UART stalls, but 24 KB of SRAM shared with a
+   2 KB stack and a 1 KB heap sets the ceiling at 2048 samples.
+
+**What would come next.** Building at `-O2` instead of `-O0` is the largest
+free improvement available and was not done. Converting the biquad and level
+smoothing to fixed-point would remove the twenty library calls per sample
+without trading away carrier frequency. Both are quantified in section 16.3.
 
 ---
 
 ## 11. Download
 
-```markdown
-TODO: Add links or attach:
-- source code archive;
-- schematic files;
-- build instructions;
-- README;
-- ChangeLog;
-- test logs;
-- demo video;
-- final presentation.
+Everything below is in this repository — there is no separate archive.
+
+| Item | Location |
+|---|---|
+| Application firmware | [`software/source/`](./software/source/) |
+| Build configuration | [`software/CMakeLists.txt`](./software/CMakeLists.txt), [`software/CMakePresets.json`](./software/CMakePresets.json) |
+| Board support | [`software/frdmmcxa153/`](./software/frdmmcxa153/), [`software/board/`](./software/board/) |
+| Electrical schematic | [`photos/circuit_image.svg`](./photos/circuit_image.svg) |
+| Wiring tables | Section 3.3 (pin allocation) and 3.6 (detailed connections) |
+| Web dashboard | [`software/tools/dashboard.html`](./software/tools/dashboard.html) |
+| Photos and screenshots | [`photos/`](./photos/) |
+| This document | `README.md`, duplicated as `project_documentation.md` |
+
+### 11.1 Building
+
+Requires the MCUXpresso SDK checkout, GNU Arm Embedded 14.2, CMake and Ninja.
+Point `SdkRootDirPath` at your SDK, then:
+
+```bash
+export ARMGCC_DIR=/path/to/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-eabi
+export SdkRootDirPath=/path/to/mcuxsdk
+export PATH="$ARMGCC_DIR/bin:$PATH"
+
+cd software
+cmake --preset debug
+cmake --build debug
 ```
+
+The ELF lands in `software/debug/`, which is deliberately gitignored. A
+`release` preset exists alongside `debug`; see section 16.3 for why building
+with it is worthwhile.
+
+To build against the real peripherals rather than the presentation build, set
+`DEMO_MODE` to `0` in [`software/source/demo_mode.h`](./software/source/demo_mode.h)
+first. Both configurations compile warning-clean with `-Werror`.
+
+### 11.2 Running the web dashboard
+
+Join the access point the board advertises (`MCXA153-AudioWS`, passphrase
+`synth1234`), then open `software/tools/dashboard.html` in a browser. It polls
+`http://192.168.4.1/status` once a second. Section 16.1 describes what it shows
+when the board is not reachable.
+
+### 11.3 Not included
+
+No demo video, slide deck or ChangeLog has been produced for this milestone,
+and the Milestone 2/3 AI chat logs are uploaded to the course platform rather
+than committed here (they are excluded by `.gitignore`).
 
 ---
 
@@ -493,6 +566,7 @@ TODO: Add links or attach:
 | 2026-08-23 | Milestone 2 completed: electrical schematics generated, breadboard assembly done, connection mapping documented | SPI shared bus contention risk | Proceed with bare-metal firmware implementation | Vancea Adrian |
 | 2026-09-03 | Firmware rewrite: real FFT-driven Synthesizer mode with selectable voice filters, real SD card recording/playback (FatFS), real WiFi/ESP8266 status+file server, mic quality pass (AGC, anti-alias, 2nd-order noise-shaped output). | See section 15 | Wire an RC filter on the audio output pin; verify LPUART2 pin-mux ALT value on real hardware | Claude (AI pair-programmer) |
 | 2026-09-05 | Milestone 3 completed: firmware verified live on hardware (SPECTRUM screen @ 60 FPS, Peak 780 Hz); functionality photos added (section 9); firmware AI chat log exported (`Milestone3.json`), hardware AI chat log exported (`Milestone2.json`) | RC audio filter + ESP8266 pin-mux ALT still to confirm on hardware | Finalize documentation, wire audio-output RC filter, verify LPUART2 ALT values | Vancea Adrian |
+| 2026-09-07 | Root-caused and fixed the two blockers: LPUART2 P1_4 was muxed to CT1_MAT2 (a timer output) instead of the UART receiver, and the SD bus was clocked far above the 100-400kHz identification limit. Redesigned the Synthesizer screen (level meter, spectrum well, frequency axis). Added the DEMO_MODE presentation build and the web dashboard. Enlarged the record ring to 128ms and cached SD free space. | Neither peripheral fix exercised on hardware yet; project still builds at -O0 | Flash with DEMO_MODE 0 and verify the SD and Wi-Fi paths; build with the release preset | Vancea Adrian + Claude (AI pair-programmer) |
 | 2026-09-07 | On-hardware audio debugging (that Sep 5 test used an earlier firmware revision): confirmed no HW DAC, reverted the AGC and the 2nd-order noise-shaped output modulator mentioned above back to the original fixed-gain 1st-order accumulator after both regressed real playback, moved per-sample processing into the SysTick ISR (fixed audio clicks caused by LCD redraws), fixed a UI bug that redrew a status dot every loop iteration instead of on change, raised the PDM carrier rate for better filterability. Documentation (this file) rewritten to match the actual 3-mode, no-touch, no-DAC, no-CMSIS-DSP implementation, dropping the earlier touch-piano/XY-pad concept. | RC filter tuning is still an open, hands-on process — some residual carrier noise may be a hard limit of a GPIO+RC "DAC" on this chip | Get the SD playback + Wi-Fi paths fully working end-to-end on hardware; apply voice effects during SD playback too | Claude (AI pair-programmer) |
 
 ---
