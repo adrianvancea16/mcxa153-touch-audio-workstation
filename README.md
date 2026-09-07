@@ -170,7 +170,7 @@ The hardware centers around the **NXP FRDM-MCXA153** development board. Acoustic
 The project schematic details the connections between the FRDM-MCXA153 development board and all the peripheral breakout modules. Note: the schematic image predates the audio-output corrections below (it may still show a DAC-style connection); the wiring described in section 3.6.4 is the current, tested one.
 
 #### Project Electrical Schematic
-![Electrical Schematic](./circuit_image.svg)
+![Electrical Schematic](./photos/circuit_image.svg)
 
 ---
 
@@ -179,9 +179,9 @@ The project schematic details the connections between the FRDM-MCXA153 developme
 The physical breadboard assembly integrates all components listed in the BOM.
 
 #### Component Photos & Breadboard Assembly
-![Assembly Photo 1](./Poza1_proiect.jpeg)
+![Assembly Photo 1](./photos/Poza1_proiect.jpeg)
 
-![Assembly Photo 2](./Poza2_proiect.jpeg)
+![Assembly Photo 2](./photos/Poza2_proiect.jpeg)
 
 ---
 
@@ -400,59 +400,59 @@ Milestone 3 delivers the full application firmware (see `software/source/`) runn
 - **Build:** MCUXpresso SDK + CMake/Ninja, GNU Arm Embedded 14.2. The project compiles and links cleanly to the target ELF.
 
 ### 9.2 Spectrum Analyzer Mode (Live)
-![Milestone 3 - Spectrum Analyzer running on hardware](./Poza1_functionalitate.jpg)
+![Milestone 3 - Spectrum Analyzer running on hardware](./photos/Poza1_functionalitate.jpg)
 
 The full breadboard assembly powered and running: the MAX4466 microphone feeds the LPADC, the firmware computes a 256-point FFT, and the ILI9341 renders the **SPECTRUM** screen — a live 32-band FFT bar spectrum with peak-hold, an oscilloscope pane, and on-screen touch controls (**MODE / REC / SYNTH**). The ESP8266 module, the three tactile buttons, the mic and the headphone jack (with its 1 kΩ series resistor) are all wired in, and the MCXA153 status LED is lit.
 
 ### 9.3 Spectrum / Oscilloscope UI Close-Up
-![Milestone 3 - SPECTRUM screen close-up](./Poza3_functionalitate.jpg)
+![Milestone 3 - SPECTRUM screen close-up](./photos/Poza3_functionalitate.jpg)
 
 Close-up of the running GUI showing live measurements read from the audio engine: **Peak: 780 Hz**, **Vpp: 323 mV**, **DC: 0.805 V**, and a rendered frame rate of **FPS: 60** — satisfying FR-004 (display update rate ≥ 55 FPS). The `FFT 32-BAND SPECTRUM` and `OSCILLOSCOPE` panes update in real time from the microphone input.
 
 ### 9.4 Display Bring-Up / Test Pattern
-![Milestone 3 - ILI9341 display test pattern](./Poza2_test.jpg)
+![Milestone 3 - ILI9341 display test pattern](./photos/Poza2_test.jpg)
 
 Hardware test shot: the ILI9341 driver rendering a full RGB colour-bar test pattern, used during display bring-up to verify the SPI wiring, colour order and address-window logic before layering the UI on top.
 
 ### 9.5 Synthesizer Mode — Current UI
 
-![Synthesizer screen running on hardware](./Poza_syntetizator_1.jpg)
+![Synthesizer screen running on hardware](./photos/Poza_syntetizator_1.jpg)
 
 The redesigned Synthesizer screen on the ILI9341, photographed on the running board. Top to bottom: the title card with the active voice effect (`filter: OFF`), the horizontal **input level meter**, and the spectrum well — 16 bands with white peak-hold caps, amplitude ticks on both margins and the frequency axis labelled **0 / 2k / 4k / 6k / 8k** (Nyquist is 8 kHz at 16 kHz sampling). The footer maps the three tactile buttons to **MODE / FILTER / FREEZE**. Everything on this screen is measured from the microphone in real time — this mode uses no simulated data in any build.
 
 Also visible: the FRDM-MCXA153, the ESP8266 module, the MAX4466 microphone, the three buttons and the RC-filtered headphone jack, all on the Milestone 2 breadboard.
 
-![Synthesizer screen with the level meter in its red zone](./Poza_syntetizator_2.jpg)
+![Synthesizer screen with the level meter in its red zone](./photos/Poza_syntetizator_2.jpg)
 
 The same screen at a louder input. The level meter has crossed into its red zone and switched from cyan to coral, and the spectrum shows the expected low-frequency-dominant roll-off of a speaking voice with the peak-hold caps trailing above the live bars.
 
 ### 9.6 SD Recorder Mode
 
-![SD Recorder screen, playback state](./Poza_redare_audio.jpg)
+![SD Recorder screen, playback state](./photos/Poza_redare_audio.jpg)
 
 The SD Recorder screen during playback: card status **DETECTED**, free space, the **PLAYING** state and the selected file `REC0001.WAV`, with the buttons mapped to **MODE / REC / PLAY**. The amber `demo - simulated card` line under the title marks that this build reports a simulated card — see section 16.
 
-![Full system with headphones connected](./Poza_sistem.jpg)
+![Full system with headphones connected](./photos/Poza_sistem.jpg)
 
 The complete workstation: MCU, breadboard, ESP8266, microphone, display and headphones connected to the RC-filtered PDM output. The recorder screen is in its **READY** state showing the selected recording and its position in the list (`1 / 3`).
 
 ### 9.7 Wi-Fi Server Mode
 
-![Wi-Fi Server screen](./Poza_server.jpg)
+![Wi-Fi Server screen](./photos/Poza_server.jpg)
 
 The Wi-Fi Server screen reporting the access point details the firmware configures — `ssid: MCXA153-AudioWS`, `ip: 192.168.4.1`, `state: AP UP` — plus a served-request counter, with the buttons mapped to **MODE / RESTART / LEVEL**. The amber `demo - simulated link` line marks the simulated state.
 
 ### 9.8 Web Dashboard (Bench Monitor)
 
-![Bench Monitor dashboard](./ScreenShot_Site.png)
+![Bench Monitor dashboard](./photos/ScreenShot_Site.png)
 
 `software/tools/dashboard.html` rendered in a browser. It mirrors the device: the same 16 spectrum bands with peak-hold, the input level, the active voice effect, and the recorder state with the recordings list and per-file download links. Hovering a band shows its exact range and magnitude — here **2500–3000 Hz, magnitude 52 / 255, peak 148**. The **CHART / TABLE** control switches to a tabular view of the same 16 bands so the data is not conveyed by the chart alone.
 
-![Dashboard, recorder detail](./Poza_recordings.png)
+![Dashboard, recorder detail](./photos/Poza_recordings.png)
 
 Recorder detail: elapsed time, remaining space, the fixed 31.25 kB/s write rate of this WAV format, and the three recordings each offering a direct `GET /download?file=` link.
 
-![Dashboard next to the running board](./Poza_site.jpg)
+![Dashboard next to the running board](./photos/Poza_site.jpg)
 
 The dashboard open on a laptop beside the workstation. See section 16.1 for what the page reads when the board is and is not reachable.
 
