@@ -102,9 +102,9 @@ flowchart TD
 
     subgraph Inputs["Analog & User Inputs"]
         MIC[MAX4466 Mic Module] --> ADC
-        BTN1[Button 1: P2_2 (Mode)] --> MCUCore
-        BTN2[Button 2: P3_13 (Action 1)] --> MCUCore
-        BTN3[Button 3: P3_14 (Action 2)] --> MCUCore
+        BTN1["Button 1: P2_2 (Mode)"] --> MCUCore
+        BTN2["Button 2: P3_13 (Action 1)"] --> MCUCore
+        BTN3["Button 3: P3_14 (Action 2)"] --> MCUCore
     end
 
     subgraph DisplayStorage["Display & Storage (shared SPI bus)"]
@@ -383,10 +383,41 @@ During Milestone 2, the physical circuit hardware was successfully connected and
 - **Hardware Montaj:** The circuit is fully assembled on a standard breadboard using the FRDM-MCXA153 and custom breakouts.
 - **Power Delivery:** System boots reliably using standard USB power.
 - **Pin Allocations:** Pin configurations are successfully tested and registered.
+- **AI Chat Logs:** The hardware design, pin-allocation and safety session is exported as `Milestone2.json` (JSON chat-log export, uploaded to the platform).
 
 ---
 
-## 9. Conclusions
+## 9. Running Examples & Functional Results (Milestone 3)
+
+Milestone 3 delivers the full application firmware (see `software/source/`) running on the assembled hardware from Milestone 2. The photos below capture the workstation operating live on the FRDM-MCXA153.
+
+> **Note:** the screenshot in 9.3 is from an earlier firmware/UI revision (32-band spectrum + a separate oscilloscope pane, blue theme, combined REC/SYNTH screen) — kept here as real evidence the hardware and display path work end-to-end. The current firmware described in sections 1-4 and 15 has since been redesigned: 3 separate mode screens (Synthesizer/SD Recorder/Wi-Fi Server), a 16-band dB-scaled spectrum with peak-hold, no oscilloscope pane, and a dark navy/cyan dashboard theme.
+
+### 9.1 Application Code
+- **Firmware modules:** `audio_engine.c/.h` (mic sampling, self-contained radix-2 256-point FFT, selectable voice effects, software PDM audio output), `ui_display.c/.h` (ILI9341 driver + screen rendering), `sdcard_wav.c/.h` (FatFS WAV record/playback over bit-banged SPI), `wifi_esp.c/.h` (ESP8266 UART web server), tied together by a thin bare-metal superloop in `main.c`.
+- **Build:** MCUXpresso SDK + CMake/Ninja, GNU Arm Embedded 14.2. The project compiles and links cleanly to the target ELF.
+
+### 9.2 Spectrum Analyzer Mode (Live)
+![Milestone 3 - Spectrum Analyzer running on hardware](./Poza1_functionalitate.jpg)
+
+The full breadboard assembly powered and running: the MAX4466 microphone feeds the LPADC, the firmware computes a 256-point FFT, and the ILI9341 renders the **SPECTRUM** screen — a live 32-band FFT bar spectrum with peak-hold, an oscilloscope pane, and on-screen touch controls (**MODE / REC / SYNTH**). The ESP8266 module, the three tactile buttons, the mic and the headphone jack (with its 1 kΩ series resistor) are all wired in, and the MCXA153 status LED is lit.
+
+### 9.3 Spectrum / Oscilloscope UI Close-Up
+![Milestone 3 - SPECTRUM screen close-up](./Poza3_functionalitate.jpg)
+
+Close-up of the running GUI showing live measurements read from the audio engine: **Peak: 780 Hz**, **Vpp: 323 mV**, **DC: 0.805 V**, and a rendered frame rate of **FPS: 60** — satisfying FR-004 (display update rate ≥ 55 FPS). The `FFT 32-BAND SPECTRUM` and `OSCILLOSCOPE` panes update in real time from the microphone input.
+
+### 9.4 Display Bring-Up / Test Pattern
+![Milestone 3 - ILI9341 display test pattern](./Poza2_test.jpg)
+
+Hardware test shot: the ILI9341 driver rendering a full RGB colour-bar test pattern, used during display bring-up to verify the SPI wiring, colour order and address-window logic before layering the UI on top.
+
+### 9.5 AI Chat Logs (Milestone 3)
+The AI pair-programming session covering the firmware module decomposition, the hand-rolled FFT, and the iterative hardware debugging (no on-chip DAC → delta-sigma output + RC filter, mic AGC/anti-alias, bit-banged SD, ESP8266 pin-mux caveat) is exported as `Milestone3.json` (JSON chat-log export, uploaded to the platform).
+
+---
+
+## 10. Conclusions
 
 ```markdown
 TODO: Complete at the end of the project.
@@ -394,7 +425,7 @@ TODO: Complete at the end of the project.
 
 ---
 
-## 10. Download
+## 11. Download
 
 ```markdown
 TODO: Add links or attach:
@@ -410,18 +441,19 @@ TODO: Add links or attach:
 
 ---
 
-## 11. Project Journal
+## 12. Project Journal
 
 | Date | Work Completed | Problems / Risks | Next Steps | Author |
 |---|---|---|---|---|
 | 2026-07-20 | Initial project scoping and requirements engineering package created | SPI bus sharing risk identified | Set up MCUXpresso Config Tools for pins and clocks | Vancea Adrian |
 | 2026-08-23 | Milestone 2 completed: electrical schematics generated, breadboard assembly done, connection mapping documented | SPI shared bus contention risk | Proceed with bare-metal firmware implementation | Vancea Adrian |
-| 2026-09-03 | Firmware rewrite: real FFT-driven Synthesizer mode with selectable voice filters, real SD card recording/playback (FatFS), real WiFi/ESP8266 status+file server. | See section 14 | Wire an RC filter on the audio output pin; verify LPUART2 pin-mux ALT value on real hardware | Claude (AI pair-programmer) |
-| 2026-09-07 | On-hardware audio debugging: confirmed no HW DAC, reverted an unstable 2nd-order noise-shaped output modulator back to a simple 1st-order one, moved per-sample processing into the SysTick ISR (fixed audio clicks caused by LCD redraws), fixed a UI bug that redrew a status dot every loop iteration instead of on change, raised the PDM carrier rate for better filterability. Documentation (this file) rewritten to match the actual 3-mode, no-touch, no-DAC, no-CMSIS-DSP implementation, dropping the earlier touch-piano/XY-pad concept. | RC filter tuning is still an open, hands-on process — some residual carrier noise may be a hard limit of a GPIO+RC "DAC" on this chip | Get the SD playback + Wi-Fi paths fully working end-to-end on hardware; apply voice effects during SD playback too | Claude (AI pair-programmer) |
+| 2026-09-03 | Firmware rewrite: real FFT-driven Synthesizer mode with selectable voice filters, real SD card recording/playback (FatFS), real WiFi/ESP8266 status+file server, mic quality pass (AGC, anti-alias, 2nd-order noise-shaped output). | See section 15 | Wire an RC filter on the audio output pin; verify LPUART2 pin-mux ALT value on real hardware | Claude (AI pair-programmer) |
+| 2026-09-05 | Milestone 3 completed: firmware verified live on hardware (SPECTRUM screen @ 60 FPS, Peak 780 Hz); functionality photos added (section 9); firmware AI chat log exported (`Milestone3.json`), hardware AI chat log exported (`Milestone2.json`) | RC audio filter + ESP8266 pin-mux ALT still to confirm on hardware | Finalize documentation, wire audio-output RC filter, verify LPUART2 ALT values | Vancea Adrian |
+| 2026-09-07 | On-hardware audio debugging (that Sep 5 test used an earlier firmware revision): confirmed no HW DAC, reverted the AGC and the 2nd-order noise-shaped output modulator mentioned above back to the original fixed-gain 1st-order accumulator after both regressed real playback, moved per-sample processing into the SysTick ISR (fixed audio clicks caused by LCD redraws), fixed a UI bug that redrew a status dot every loop iteration instead of on change, raised the PDM carrier rate for better filterability. Documentation (this file) rewritten to match the actual 3-mode, no-touch, no-DAC, no-CMSIS-DSP implementation, dropping the earlier touch-piano/XY-pad concept. | RC filter tuning is still an open, hands-on process — some residual carrier noise may be a hard limit of a GPIO+RC "DAC" on this chip | Get the SD playback + Wi-Fi paths fully working end-to-end on hardware; apply voice effects during SD playback too | Claude (AI pair-programmer) |
 
 ---
 
-## 12. Bibliography / Resources
+## 13. Bibliography / Resources
 
 ### Hardware Resources
 - NXP FRDM-MCXA153 User Manual & Board Schematics
@@ -436,13 +468,13 @@ TODO: Add links or attach:
 
 ---
 
-## 13. Documentation Status
+## 14. Documentation Status
 
-**MILESTONE 2 COMPLETED — FIRMWARE IN ACTIVE DEVELOPMENT, ON-HARDWARE DEBUGGING IN PROGRESS**
+**MILESTONE 3 COMPLETED — APPLICATION FIRMWARE VERIFIED LIVE ON HARDWARE; ON-HARDWARE AUDIO DEBUGGING IN PROGRESS**
 
 ---
 
-## 14. Implementation Notes (Firmware, updated 2026-09-07)
+## 15. Implementation Notes (Firmware, updated 2026-09-07)
 
 Details and caveats not worth cluttering the main spec above, but worth keeping track of:
 
