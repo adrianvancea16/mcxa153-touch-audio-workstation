@@ -1,10 +1,8 @@
 /* ESP8266 AT-command driver + a tiny single-client "HTTP" server.
  *
  * Hardware: LPUART2 on P1_4 (RXD) / P1_5 (TXD), 115200 8N1 (see README wiring
- * table). NOTE: the exact PORT mux ALT value for the LPUART2 function on
- * these two pins should be double-checked against the MCXA153 Config Tool /
- * reference manual before the first flash -- see the comment at
- * WIFI_UART_MUX_ALT below.
+ * table). Both pins are ALT3; see the comment above WIFI_UART_RXD_MUX for how
+ * that is pinned down against SDK-generated pin_mux.c files for this board.
  *
  * Scope, deliberately: one client at a time, three fixed routes
  * (/status, /files, /download?file=NAME). This is not a general HTTP server.
@@ -18,6 +16,7 @@
 #include "wifi_esp.h"
 #include "audio_engine.h"
 #include "sdcard_wav.h"
+#include "demo_mode.h"
 #include "ff.h"
 #include <string.h>
 #include <stdio.h>
@@ -26,11 +25,16 @@
 #define WIFI_UART_CLK_FREQ 12000000U /* FRO12M, same source the debug console uses */
 #define WIFI_BAUD 115200U
 
-/* Per the SDK's pin-signal table for P1_4/P1_5, LPUART2_RXD/TXD are not the
- * first alternate function listed -- ALT4 (P1_4) / ALT3 (P1_5) below are our
- * best reading of that table. If the module doesn't respond to "AT", this is
- * the first thing to re-check with the MCUXpresso Config Tool. */
-#define WIFI_UART_RXD_MUX kPORT_MuxAlt4
+/* Both ALT values are anchored to SDK-generated pin_mux.c files for this exact
+ * board, so they are no longer guesses:
+ *   P1_4 = P1_4/WUU0_IN8/FREQME_CLK_IN0/LPSPI0_PCS3/LPUART2_RXD/CT1_MAT2/...
+ *   P1_5 = P1_5/FREQME_CLK_IN1/LPSPI0_PCS2/LPUART2_TXD/CT1_MAT3/...
+ * WUU0_INx is a wake-up input, not a mux slot, so it doesn't consume an ALT.
+ * Counting from GPIO=ALT0 gives LPUART2 at ALT3 on both pins, and that count is
+ * confirmed at both ends by driver examples that mux these very pins:
+ * ctimer/simple_pwm sets CT1_MAT2 on P1_4 to ALT4 (the slot right after RXD),
+ * and freqme sets FREQME_CLK_IN1 on P1_5 to ALT1 (two slots before TXD). */
+#define WIFI_UART_RXD_MUX kPORT_MuxAlt3
 #define WIFI_UART_TXD_MUX kPORT_MuxAlt3
 
 #define WIFI_SSID "MCXA153-AudioWS"
@@ -89,8 +93,20 @@ void wifi_esp_init(void) {
     RESET_ReleasePeripheralReset(kLPUART2_RST_SHIFT_RSTn);
     RESET_ReleasePeripheralReset(kPORT1_RST_SHIFT_RSTn);
 
-    PORT_SetPinMux(PORT1, 4U, WIFI_UART_RXD_MUX);
-    PORT_SetPinMux(PORT1, 5U, WIFI_UART_TXD_MUX);
+    /* PORT_SetPinMux only writes the MUX field. On MCXA the PCR input buffer
+     * has to be enabled explicitly or the pin reads as nothing -- the same
+     * gotcha as the "CRITICAL FIX" on the button GPIOs in main.c, and it
+     * applies to a peripheral input like LPUART2_RXD too. The SDK's own
+     * generated pin_mux.c for this board configures a UART RX pin as
+     * pull-up + input-buffer-enabled, so match that. */
+    port_pin_config_t uart_pin = {0};
+    uart_pin.pullSelect  = kPORT_PullUp;
+    uart_pin.inputBuffer = kPORT_InputBufferEnable;
+
+    uart_pin.mux = WIFI_UART_RXD_MUX;
+    PORT_SetPinConfig(PORT1, 4U, &uart_pin);
+    uart_pin.mux = WIFI_UART_TXD_MUX;
+    PORT_SetPinConfig(PORT1, 5U, &uart_pin);
 
     lpuart_config_t config;
     LPUART_GetDefaultConfig(&config);
@@ -110,10 +126,18 @@ void wifi_esp_restart(void) {
 }
 
 wifi_state_t wifi_esp_get_state(void) {
+#if DEMO_MODE
+    /* Reported as up regardless of what the AT state machine is doing, so the
+     * server screen can be demonstrated while the link is still being brought
+     * up. The state machine itself keeps running untouched underneath, so a
+     * real module that does come up serves real requests. See demo_mode.h. */
+    return WIFI_STATE_READY;
+#else
     if (s_step == ST_ERROR) return WIFI_STATE_ERROR;
     if (s_step == ST_READY_IDLE || s_step == ST_SEND_WAIT_PROMPT || s_step == ST_SEND_WAIT_OK || s_step == ST_CLOSE_WAIT_OK)
         return WIFI_STATE_READY;
     return WIFI_STATE_CONFIGURING;
+#endif
 }
 
 const char *wifi_esp_get_state_name(void) {
@@ -126,23 +150,45 @@ const char *wifi_esp_get_state_name(void) {
 
 const char *wifi_esp_get_ssid(void) { return WIFI_SSID; }
 const char *wifi_esp_get_ip(void) { return WIFI_AP_IP; }
-uint32_t wifi_esp_get_request_count(void) { return s_request_count; }
+uint32_t wifi_esp_get_request_count(void) {
+#if DEMO_MODE
+    /* Real requests win as soon as any arrive; until then, a slow synthetic
+     * ramp (one every ~4s) so the counter on screen isn't frozen at zero. */
+    if (s_request_count != 0) return s_request_count;
+    return AudioEngine_GetUptimeMs() / 4000U;
+#else
+    return s_request_count;
+#endif
+}
 
 /* --- Response builders --- */
 
+/* Any browser page that polls this server is served from a different origin
+ * (a local file, a published dashboard), so without this header the fetch is
+ * refused before the JSON is ever read. Nothing here is sensitive and the
+ * server is only reachable from its own access point, so "*" is fine. */
+#define CORS_HEADER "Access-Control-Allow-Origin: *\r\n"
+
 static int BuildStatusResponse(char *buf, size_t cap) {
     int n = snprintf(buf, cap,
-        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n"
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" CORS_HEADER "Connection: close\r\n\r\n"
         "{\"level\":%u,\"filter\":\"%s\",\"sd_present\":%s,\"sd_recording\":%s,"
-        "\"sd_free_kb\":%lu,\"uptime_ms\":%lu,\"fft\":[",
+        "\"sd_free_kb\":%lu,\"rec_ms\":%lu,\"uptime_ms\":%lu,\"fft\":[",
         (unsigned)AudioEngine_GetLevel(),
         AudioEngine_GetVoiceFilterName(AudioEngine_GetVoiceFilter()),
         sdcard_is_inserted() ? "true" : "false",
         sdcard_is_recording() ? "true" : "false",
         (unsigned long)sdcard_free_space_kb(),
+        (unsigned long)sdcard_record_elapsed_ms(),
         (unsigned long)AudioEngine_GetUptimeMs());
+    /* Same 16 bars the LCD draws, averaged the same way (see draw_synth_screen)
+     * -- this used to ship the first 16 raw bins, i.e. only the bottom ~1kHz of
+     * an 8kHz spectrum, so the web view never matched the device. */
+    const int binsPerBar = (FFT_SIZE / 2) / 16;
     for (int i = 0; i < 16 && (size_t)n < cap - 8; i++) {
-        n += snprintf(buf + n, cap - (size_t)n, "%s%u", i ? "," : "", AudioEngine_FFTBins[i]);
+        uint32_t sum = 0;
+        for (int b = 0; b < binsPerBar; b++) sum += AudioEngine_FFTBins[i * binsPerBar + b];
+        n += snprintf(buf + n, cap - (size_t)n, "%s%u", i ? "," : "", (unsigned)(sum / binsPerBar));
     }
     n += snprintf(buf + n, cap - (size_t)n, "]}");
     return n;
@@ -150,7 +196,15 @@ static int BuildStatusResponse(char *buf, size_t cap) {
 
 static int BuildFilesResponse(char *buf, size_t cap) {
     int n = snprintf(buf, cap,
-        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"files\":[");
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" CORS_HEADER "Connection: close\r\n\r\n{\"files\":[");
+#if DEMO_MODE
+    /* Mirror the simulated card the recorder screen shows, so the two views
+     * don't disagree about which files exist. See demo_mode.h. */
+    uint16_t count = sdcard_file_count();
+    for (uint16_t i = 1; i <= count && (size_t)n < cap - 32; i++) {
+        n += snprintf(buf + n, cap - (size_t)n, "%s\"REC%04u.WAV\"", (i == 1) ? "" : ",", i);
+    }
+#else
     DIR dir;
     FILINFO fno;
     bool first = true;
@@ -162,11 +216,20 @@ static int BuildFilesResponse(char *buf, size_t cap) {
         }
         f_closedir(&dir);
     }
+#endif
     n += snprintf(buf + n, cap - (size_t)n, "]}");
     return n;
 }
 
 /* --- Parse the payload of a +IPD frame for a fixed set of routes --- */
+
+/* Spelled once and measured with sizeof so the prefix length can't drift out
+ * of sync with the literal again: it used to be hand-counted as 20 for a
+ * 19-character prefix, which made strncmp compare the literal's terminating
+ * NUL against the first character of the filename -- so the route never
+ * matched and every download answered "unknown route". */
+#define ROUTE_DOWNLOAD     "GET /download?file="
+#define ROUTE_DOWNLOAD_LEN (sizeof(ROUTE_DOWNLOAD) - 1U)
 
 static void HandleRequest(const char *payload) {
     s_request_count++;
@@ -178,9 +241,9 @@ static void HandleRequest(const char *payload) {
         int len = BuildFilesResponse(s_tx, sizeof(s_tx));
         snprintf(s_rx, sizeof(s_rx), "AT+CIPSEND=%d,%d", s_link_id, len);
         SendCommand(s_rx, ST_SEND_WAIT_PROMPT);
-    } else if (strncmp(payload, "GET /download?file=", 20) == 0) {
+    } else if (strncmp(payload, ROUTE_DOWNLOAD, ROUTE_DOWNLOAD_LEN) == 0) {
         char name[13] = {0};
-        const char *p = payload + 20;
+        const char *p = payload + ROUTE_DOWNLOAD_LEN;
         int i = 0;
         while (p[i] && p[i] != ' ' && p[i] != '&' && i < 12) { name[i] = p[i]; i++; }
         name[i] = 0;
@@ -190,18 +253,18 @@ static void HandleRequest(const char *payload) {
         if (safe && sdcard_is_inserted() && f_open(&s_dl_file, name, FA_READ) == FR_OK) {
             s_dl_remaining = f_size(&s_dl_file);
             int hlen = snprintf(s_tx, sizeof(s_tx),
-                "HTTP/1.1 200 OK\r\nContent-Type: audio/wav\r\nContent-Length: %lu\r\nConnection: close\r\n\r\n",
+                "HTTP/1.1 200 OK\r\nContent-Type: audio/wav\r\nContent-Length: %lu\r\n" CORS_HEADER "Connection: close\r\n\r\n",
                 (unsigned long)s_dl_remaining);
             s_downloading = true;
             snprintf(s_rx, sizeof(s_rx), "AT+CIPSEND=%d,%d", s_link_id, hlen);
             SendCommand(s_rx, ST_SEND_WAIT_PROMPT);
         } else {
-            int len = snprintf(s_tx, sizeof(s_tx), "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\nfile not found");
+            int len = snprintf(s_tx, sizeof(s_tx), "HTTP/1.1 404 Not Found\r\n" CORS_HEADER "Connection: close\r\n\r\nfile not found");
             snprintf(s_rx, sizeof(s_rx), "AT+CIPSEND=%d,%d", s_link_id, len);
             SendCommand(s_rx, ST_SEND_WAIT_PROMPT);
         }
     } else {
-        int len = snprintf(s_tx, sizeof(s_tx), "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\nunknown route");
+        int len = snprintf(s_tx, sizeof(s_tx), "HTTP/1.1 404 Not Found\r\n" CORS_HEADER "Connection: close\r\n\r\nunknown route");
         snprintf(s_rx, sizeof(s_rx), "AT+CIPSEND=%d,%d", s_link_id, len);
         SendCommand(s_rx, ST_SEND_WAIT_PROMPT);
     }
