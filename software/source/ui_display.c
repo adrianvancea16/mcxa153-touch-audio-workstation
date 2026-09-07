@@ -10,6 +10,7 @@
 #include "audio_engine.h"
 #include "sdcard_wav.h"
 #include "wifi_esp.h"
+#include "demo_mode.h"
 
 /* ==========================================================================
  * LCD hardware driver (bit-banged SPI to a real ILI9341, 240x320 portrait).
@@ -122,6 +123,10 @@ void ui_display_init(void) {
 #define COLOR_ACCENT2 0xB2DF // violet
 #define COLOR_WARN    0xFA2B // coral red
 #define COLOR_OK      0x3F31 // spring green
+#define COLOR_WELL    0x0000 // instrument "well" behind the bars -- true black, so
+                             // the gradient bars read as brightly as possible
+#define COLOR_REDZONE 0x5000 // dim red track at the top of the level meter
+#define COLOR_DEMO    0xFD20 // amber, used only to label simulated state
 
 /* Spectrum gradient stops: green -> cyan -> violet -> pink, bottom to top */
 #define SPEC_C0 0x3732
@@ -286,14 +291,16 @@ static uint16_t lerp565(uint16_t c0, uint16_t c1, uint8_t t) {
     return (uint16_t)((r << 11) | (g << 5) | b);
 }
 
-/* Continuous 4-stop gradient (green -> cyan -> violet -> pink) across a
- * 0-200 bar height, instead of the old flat 3-tier VU-meter coloring. */
-uint16_t get_gradient_color(int height) {
-    if (height < 0) height = 0;
-    if (height > 200) height = 200;
-    if (height <= 66)       return lerp565(SPEC_C0, SPEC_C1, (uint8_t)(height * 255 / 66));
-    else if (height <= 133) return lerp565(SPEC_C1, SPEC_C2, (uint8_t)((height - 66) * 255 / 67));
-    else                    return lerp565(SPEC_C2, SPEC_C3, (uint8_t)((height - 133) * 255 / 67));
+/* Continuous 4-stop gradient (green -> cyan -> violet -> pink) instead of the
+ * old flat 3-tier VU-meter coloring. Takes the bin magnitude (0-255) rather
+ * than a pixel height, so the colour tracks how loud the band actually is and
+ * stays put if the bar geometry is ever retuned. */
+uint16_t get_gradient_color(int level) {
+    if (level < 0) level = 0;
+    if (level > 255) level = 255;
+    if (level <= 85)       return lerp565(SPEC_C0, SPEC_C1, (uint8_t)(level * 255 / 85));
+    else if (level <= 170) return lerp565(SPEC_C1, SPEC_C2, (uint8_t)((level - 85) * 255 / 85));
+    else                   return lerp565(SPEC_C2, SPEC_C3, (uint8_t)((level - 170) * 255 / 85));
 }
 
 static void draw_footer(const char *label1, uint16_t tint1, const char *label2, uint16_t tint2, const char *label3, uint16_t tint3) {
@@ -317,21 +324,112 @@ void ui_display_mode(uint8_t mode) {
     if (mode != APP_MODE_SD || !sdcard_is_playing()) AudioEngine_SetMode(AUDIO_MODE_SYNTH);
 }
 
-/* ---------------- SYNTHESIZER ---------------- */
+/* ---------------- SYNTHESIZER ----------------
+ *
+ * Layout, top to bottom:  header card (5..49) / input level meter (56..79) /
+ * spectrum well (86..265) / frequency axis (269) / footer (280..315).
+ *
+ * The spectrum sits in a black "well" with a baseline rail and edge ticks so
+ * it reads as an instrument rather than bars floating on the background. The
+ * axis labels and ticks live in the margins either side of the bars, which is
+ * what makes them affordable: they are drawn once per screen redraw and are
+ * never touched by the per-frame bar clearing. */
 #define SPECTRUM_BARS 16 /* divides FFT_SIZE/2 (128) evenly -- every bin gets shown, none dropped */
 #define SPECTRUM_BAR_PITCH 13
 #define SPECTRUM_BAR_WIDTH 10
+
+#define SPEC_X      5
+#define SPEC_Y      86
+#define SPEC_W      230
+#define SPEC_H      180
+#define SPEC_BASE   261 /* y of the bar baseline */
+#define SPEC_MAX_H  160 /* tallest bar reaches y = SPEC_BASE - SPEC_MAX_H */
+#define SPEC_BAR_X0 14  /* 16 bars at pitch 13 -> x 14..217 */
+
+#define METER_X   14
+#define METER_Y   68
+#define METER_W   212
+#define METER_H   11
+#define METER_RED (METER_W * 82 / 100) /* start of the red zone on the track */
+/* Reading that counts as full scale. GetLevel() is a smoothed absolute sample
+ * (0-32767), but after the fixed 4x gain a normal speaking voice sits well
+ * under 10k, so scaling against the full range would leave the meter barely
+ * twitching. */
+#define METER_FULL_SCALE 9000U
+
 static uint8_t s_peak[SPECTRUM_BARS] = {0};
 static uint32_t s_blink_counter = 0;
+
+/* Repaint a horizontal slice of the level-meter track, honouring the red zone
+ * so an erase never wipes it out. */
+static void meter_track(int from, int to) {
+    if (to <= from) return;
+    if (to <= METER_RED) {
+        draw_rect(METER_X + from, METER_Y, to - from, METER_H, COLOR_WELL);
+    } else if (from >= METER_RED) {
+        draw_rect(METER_X + from, METER_Y, to - from, METER_H, COLOR_REDZONE);
+    } else {
+        draw_rect(METER_X + from, METER_Y, METER_RED - from, METER_H, COLOR_WELL);
+        draw_rect(METER_X + METER_RED, METER_Y, to - METER_RED, METER_H, COLOR_REDZONE);
+    }
+}
+
+static int s_meter_w = 0;
+static uint16_t s_meter_fill = 0;
+
+static void draw_level_meter(void) {
+    uint32_t w = ((uint32_t)AudioEngine_GetLevel() * METER_W) / METER_FULL_SCALE;
+    if (w > METER_W) w = METER_W;
+
+    uint16_t fill = (w > (uint32_t)METER_RED) ? COLOR_WARN : COLOR_ACCENT;
+    if (fill != s_meter_fill) {
+        /* Tier changed, so the whole filled part needs the new colour. */
+        if (w > 0) draw_rect(METER_X, METER_Y, (int)w, METER_H, fill);
+        meter_track((int)w, METER_W);
+        s_meter_fill = fill;
+    } else if ((int)w > s_meter_w) {
+        draw_rect(METER_X + s_meter_w, METER_Y, (int)w - s_meter_w, METER_H, fill);
+    } else if ((int)w < s_meter_w) {
+        meter_track((int)w, s_meter_w);
+    }
+    s_meter_w = (int)w;
+}
 
 static void draw_synth_screen(void) {
     if (redraw_needed) {
         lcd_fill_screen(COLOR_BG);
+
         draw_card(5, 5, 230, 44, COLOR_HEADER, COLOR_ACCENT);
-        draw_string_scaled(15, 14, "SYNTHESIZER", COLOR_TEXT, 2);
+        draw_string_scaled(14, 13, "SYNTHESIZER", COLOR_TEXT, 2);
         char buf[24];
         snprintf(buf, sizeof(buf), "filter: %s", AudioEngine_GetVoiceFilterName(AudioEngine_GetVoiceFilter()));
-        draw_string_scaled(15, 36, buf, COLOR_ACCENT2, 1);
+        draw_string_scaled(14, 34, buf, COLOR_ACCENT2, 1);
+
+        /* Input level meter */
+        draw_string_scaled(14, 56, "input", COLOR_MUTED, 1);
+        s_meter_w = METER_W; s_meter_fill = COLOR_ACCENT; /* force a full repaint below */
+        meter_track(0, METER_W);
+        s_meter_w = 0;
+
+        /* Spectrum well */
+        draw_rect(SPEC_X, SPEC_Y, SPEC_W, SPEC_H, COLOR_BORDER);
+        draw_rect(SPEC_X + 2, SPEC_Y + 2, SPEC_W - 4, SPEC_H - 4, COLOR_WELL);
+        draw_rect(SPEC_X + 2, SPEC_BASE + 1, SPEC_W - 4, 2, COLOR_BORDER); /* baseline rail */
+
+        /* Amplitude ticks, in the margins either side of the bars so the
+         * per-frame bar clearing never has to repaint them. */
+        for (int q = 1; q <= 3; q++) {
+            int y = SPEC_BASE - (SPEC_MAX_H * q) / 4;
+            draw_rect(SPEC_X + 3, y, 5, 1, COLOR_BORDER);
+            draw_rect(SPEC_X + SPEC_W - 8, y, 5, 1, COLOR_BORDER);
+        }
+
+        /* Frequency axis: 16kHz sampling, so the 16 bars span DC to 8kHz. */
+        draw_string_scaled(SPEC_BAR_X0, 269, "0", COLOR_MUTED, 1);
+        draw_string_scaled(SPEC_BAR_X0 + 4 * SPECTRUM_BAR_PITCH, 269, "2k", COLOR_MUTED, 1);
+        draw_string_scaled(SPEC_BAR_X0 + 8 * SPECTRUM_BAR_PITCH, 269, "4k", COLOR_MUTED, 1);
+        draw_string_scaled(SPEC_BAR_X0 + 12 * SPECTRUM_BAR_PITCH, 269, "6k", COLOR_MUTED, 1);
+        draw_string_scaled(SPEC_BAR_X0 + 15 * SPECTRUM_BAR_PITCH + 2, 269, "8k", COLOR_MUTED, 1);
 
         draw_footer("MODE", COLOR_BORDER, "FILTER", COLOR_ACCENT2, freeze ? "RESUME" : "FREEZE", freeze ? COLOR_WARN : COLOR_OK);
         for (int i = 0; i < SPECTRUM_BARS; i++) s_peak[i] = 0;
@@ -355,20 +453,25 @@ static void draw_synth_screen(void) {
         s_last_dot_color = dot_color;
     }
 
+    /* Everything below repaints on the FFT cadence (~16ms), never per
+     * main-loop iteration -- see the note on the blinking dot above. */
     if (AudioEngine_FFTReady) {
+        draw_level_meter(); /* stays live even when the spectrum is frozen */
+
         if (!freeze) {
             const int bins_per_bar = (FFT_SIZE / 2) / SPECTRUM_BARS;
             for (int i = 0; i < SPECTRUM_BARS; i++) {
                 uint32_t sum = 0;
                 for (int b = 0; b < bins_per_bar; b++) sum += AudioEngine_FFTBins[i * bins_per_bar + b];
-                uint8_t h = (uint8_t)((sum / bins_per_bar) * 200U / 255U);
+                int level = (int)(sum / bins_per_bar);      /* 0-255 magnitude */
+                int h = (level * SPEC_MAX_H) / 255;         /* -> pixels */
 
-                if (h > s_peak[i]) s_peak[i] = h;
+                if (h > (int)s_peak[i]) s_peak[i] = (uint8_t)h;
 
-                int x = 10 + i * SPECTRUM_BAR_PITCH;
-                draw_rect(x, 270 - 200, SPECTRUM_BAR_WIDTH, 200 - h, COLOR_BG);
-                draw_rect(x, 270 - h, SPECTRUM_BAR_WIDTH, h, get_gradient_color(h));
-                draw_rect(x, 270 - s_peak[i] - 2, SPECTRUM_BAR_WIDTH, 2, COLOR_TEXT);
+                int x = SPEC_BAR_X0 + i * SPECTRUM_BAR_PITCH;
+                draw_rect(x, SPEC_BASE - SPEC_MAX_H, SPECTRUM_BAR_WIDTH, SPEC_MAX_H - h, COLOR_WELL);
+                if (h > 0) draw_rect(x, SPEC_BASE - h, SPECTRUM_BAR_WIDTH, h, get_gradient_color(level));
+                draw_rect(x, SPEC_BASE - s_peak[i] - 2, SPECTRUM_BAR_WIDTH, 2, COLOR_TEXT);
 
                 if (s_peak[i] > 0) s_peak[i]--; /* slow decay */
             }
@@ -396,7 +499,14 @@ static void draw_sd_screen(void) {
     if (redraw_needed) {
         lcd_fill_screen(COLOR_BG);
         draw_card(5, 5, 230, 44, COLOR_HEADER, COLOR_ACCENT);
+#if DEMO_MODE
+        /* Says so on screen, so a photo of this build is never mistaken for a
+         * working card. See demo_mode.h. */
+        draw_string_scaled(14, 12, "SD RECORDER", COLOR_TEXT, 2);
+        draw_string_scaled(14, 33, "demo - simulated card", COLOR_DEMO, 1);
+#else
         draw_string_scaled(15, 20, "SD RECORDER", COLOR_TEXT, 2);
+#endif
 
         draw_card(5, 55, 230, 65, COLOR_PANEL, present ? COLOR_OK : COLOR_WARN);
         draw_string_scaled(15, 65, "sd card status", COLOR_MUTED, 1);
@@ -469,7 +579,12 @@ static void draw_wifi_screen(void) {
     if (redraw_needed) {
         lcd_fill_screen(COLOR_BG);
         draw_card(5, 5, 230, 44, COLOR_HEADER, COLOR_ACCENT2);
+#if DEMO_MODE
+        draw_string_scaled(14, 12, "WIFI SERVER", COLOR_TEXT, 2);
+        draw_string_scaled(14, 33, "demo - simulated link", COLOR_DEMO, 1);
+#else
         draw_string_scaled(15, 20, "WIFI SERVER", COLOR_TEXT, 2);
+#endif
 
         draw_card(5, 55, 230, 100, COLOR_PANEL, COLOR_ACCENT2);
         char buf[28];
