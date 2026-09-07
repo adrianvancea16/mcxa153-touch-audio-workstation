@@ -11,7 +11,21 @@
  * ~16KB of the 24KB SRAM this chip has). sdcard_wav.c drains/fills these
  * from the main superloop while AudioEngine_Process() (driven by the
  * SysTick-derived sample-rate flag) fills/drains them in real time. */
-#define AUDIO_REC_RING_SIZE  512U
+/* The record ring has to cover the worst pause the main loop can take between
+ * drains, because the producer side runs in the SysTick ISR and cannot wait.
+ * Two things stall it for far longer than you would guess: an SD card can go
+ * away for 100ms+ doing internal housekeeping mid-write, and wifi_esp.c sends
+ * over LPUART with LPUART_WriteBlocking, which parks the loop for ~27ms per
+ * ~310-byte /status reply. At 16kHz the old 512 samples was only 32ms of
+ * headroom, so recording while a browser polled the board dropped audio.
+ * 2048 samples = 128ms, which covers the UART block and the common card
+ * stalls. 4096 (256ms) was measured first and is the nicer number, but with
+ * DEMO_MODE off it left only ~700 bytes of SRAM once the 2KB stack and 1KB
+ * heap are placed -- too thin for FatFS's deeper call chains. RAM, not the
+ * audio, is what caps this.
+ * Playback is the easy direction -- reads have low, predictable latency and
+ * the consumer is the one that can wait -- so it keeps the smaller buffer. */
+#define AUDIO_REC_RING_SIZE  2048U
 #define AUDIO_PLAY_RING_SIZE 512U
 
 typedef enum {
