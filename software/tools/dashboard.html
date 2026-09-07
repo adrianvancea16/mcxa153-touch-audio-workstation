@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  MCXA153 Bench Monitor - standalone copy.
+
+  Open this file directly in a browser while joined to the board's access point
+  (SSID MCXA153-AudioWS) and it polls http://192.168.4.1/status for real
+  readings. When the board is not reachable it renders a placeholder signal so
+  the layout can still be seen - see README section 16.
+
+  Kept in sync with the published artifact; edit that and regenerate.
+-->
+<style>
+  :root{color-scheme:light}
+  body{margin:0;font:14px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#fcfcfb}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+</style>
+<title>MCXA153 Bench Monitor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#EDF1F0; --surface:#FFFFFF; --sunk:#E3E9E8; --edge:#CDD6D4;
+  --ink:#111817; --ink-2:#4C5A5B; --ink-3:#77878A;
+  --accent:#0A7699;
+  --good:#4F7A16; --warn:#8C6114; --crit:#B23A2E;
+  --lamp-ring:rgba(10,118,153,.18);
+  --shadow:0 1px 1px rgba(12,28,30,.05), 0 10px 26px -14px rgba(12,28,30,.30);
+  /* The spectrum "screen" stays dark in both themes, the way an instrument's
+     display is dark even on a white bench. */
+  --well:#05100E; --well-edge:#0B211E; --well-line:#12312C; --well-ink:#6E9691;
+  --spec-0:#14605C; --spec-1:#1A8880; --spec-2:#22B3A5; --spec-3:#48E8D4;
+  --peak:#EAF6F4;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#090E0F; --surface:#131A1B; --sunk:#0E1516; --edge:#263234;
+    --ink:#E7EDEC; --ink-2:#9CADAE; --ink-3:#6F8183;
+    --accent:#2FC8D8;
+    --good:#63B451; --warn:#DCA33F; --crit:#E06A5A;
+    --lamp-ring:rgba(47,200,216,.20);
+    --shadow:0 1px 1px rgba(0,0,0,.4), 0 10px 26px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#090E0F; --surface:#131A1B; --sunk:#0E1516; --edge:#263234;
+  --ink:#E7EDEC; --ink-2:#9CADAE; --ink-3:#6F8183;
+  --accent:#2FC8D8;
+  --good:#63B451; --warn:#DCA33F; --crit:#E06A5A;
+  --lamp-ring:rgba(47,200,216,.20);
+  --shadow:0 1px 1px rgba(0,0,0,.4), 0 10px 26px -14px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--ground); color:var(--ink);
+  font-family:Archivo,"Helvetica Neue",Arial,sans-serif;
+  font-size:14px; line-height:1.5;
+  padding:22px 20px 44px;
+}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+
+/* Panel legend: the uppercase micro-labels, set like equipment silkscreen. */
+.legend{
+  font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-3);
+}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+/* ---- top rail ---- */
+.rail{
+  display:flex;flex-wrap:wrap;align-items:center;gap:14px 20px;
+  background:var(--surface);border:1px solid var(--edge);border-radius:3px;
+  padding:14px 18px;box-shadow:var(--shadow);
+}
+.ident{display:flex;flex-direction:column;gap:1px;margin-right:auto}
+.ident h1{margin:0;font-size:19px;font-weight:700;letter-spacing:-.01em;line-height:1.15}
+.ident .sub{font-size:12px;color:var(--ink-2)}
+.railstat{display:flex;flex-direction:column;gap:2px;min-width:96px}
+.railstat b{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:15px;font-weight:500;font-variant-numeric:tabular-nums}
+
+.lamp{
+  display:inline-flex;align-items:center;gap:8px;
+  border:1px solid var(--edge);border-radius:2px;padding:6px 11px 6px 9px;
+  background:var(--sunk);
+}
+.lamp .dot{width:9px;height:9px;border-radius:50%;flex:none;background:currentColor;
+  box-shadow:0 0 0 3px var(--lamp-ring)}
+.lamp .txt{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.lamp .note{font-size:11px;color:var(--ink-2);letter-spacing:0;text-transform:none;font-weight:400}
+/* Device identity, not a status claim -- carries the accent hue, deliberately
+   not the reserved good/warn/crit palette. */
+.lamp{color:var(--accent)}
+
+/* ---- controls ---- */
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--edge);border-radius:2px;overflow:hidden;background:var(--surface)}
+.seg button{
+  font:inherit;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  padding:7px 13px;border:0;background:transparent;color:var(--ink-2);cursor:pointer;
+}
+.seg button+button{border-left:1px solid var(--edge)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
+.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+
+/* ---- spectrum ---- */
+.screen{
+  background:var(--well);border:1px solid var(--well-edge);border-radius:3px;
+  padding:16px 16px 10px;box-shadow:var(--shadow);position:relative;
+}
+.screen .cap{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:12px}
+.screen .cap .legend{color:var(--well-ink)}
+.screen .cap .val{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--well-ink);font-variant-numeric:tabular-nums}
+
+.plot{position:relative;height:210px}
+.grid{position:absolute;inset:0;pointer-events:none}
+.grid i{position:absolute;left:0;right:0;height:1px;background:var(--well-line)}
+.bars{position:absolute;inset:0;display:flex;align-items:flex-end;gap:4px}
+.bar{position:relative;flex:1;height:100%;background:none;border:0;padding:0;cursor:default}
+.bar .fill{position:absolute;left:0;right:0;bottom:0;border-radius:3px 3px 0 0;background:var(--spec-1)}
+.bar .cap2{position:absolute;left:0;right:0;height:2px;background:var(--peak);border-radius:2px}
+.anim .bar .fill,.anim .bar .cap2{transition:height .1s linear,bottom .1s linear}
+.bar:focus-visible{outline:2px solid var(--spec-3);outline-offset:2px}
+.baseline{position:absolute;left:0;right:0;bottom:-1px;height:1px;background:var(--well-line)}
+.axis{display:flex;justify-content:space-between;margin-top:7px}
+.axis span{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--well-ink)}
+
+.tip{
+  position:absolute;z-index:5;pointer-events:none;opacity:0;transform:translate(-50%,-100%);
+  background:var(--surface);color:var(--ink);border:1px solid var(--edge);border-radius:3px;
+  padding:7px 10px;box-shadow:var(--shadow);white-space:nowrap;
+}
+.tip b{display:block;font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600}
+.tip span{font-size:11px;color:var(--ink-2)}
+.tip.on{opacity:1}
+
+/* ---- readout tiles ---- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--edge);border-radius:3px;padding:13px 15px;
+  display:flex;flex-direction:column;gap:7px;box-shadow:var(--shadow)}
+.tile .big{font-family:"IBM Plex Mono",monospace;font-size:23px;font-weight:500;line-height:1;font-variant-numeric:tabular-nums}
+.tile .big s{text-decoration:none;font-size:12px;color:var(--ink-3);margin-left:3px}
+.meter{height:8px;background:var(--sunk);border-radius:2px;overflow:hidden;display:flex}
+.meter i{background:var(--accent);border-radius:2px}
+.meter.hot i{background:var(--crit)}
+
+/* ---- lower cards ---- */
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;align-items:start}
+.card{background:var(--surface);border:1px solid var(--edge);border-radius:3px;box-shadow:var(--shadow)}
+.card h2{margin:0;padding:13px 16px;font-size:12px;font-weight:700;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-2);border-bottom:1px solid var(--edge)}
+.card .body{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+
+.kv{display:flex;justify-content:space-between;gap:14px;align-items:baseline}
+.kv .k{font-size:12px;color:var(--ink-2)}
+.kv .v{font-family:"IBM Plex Mono",monospace;font-size:13px;font-variant-numeric:tabular-nums;text-align:right}
+
+.chip{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;
+  border:1px solid currentColor;border-radius:2px;padding:3px 9px;
+  font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+.chip .g{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.chip.rec{color:var(--crit)} .chip.idle{color:var(--ink-3)} .chip.play{color:var(--good)}
+
+.files{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.files li{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:7px 0;border-top:1px solid var(--edge)}
+.files li:first-child{border-top:0}
+.files .nm{font-family:"IBM Plex Mono",monospace;font-size:13px}
+.files a{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--accent);text-decoration:none;border-bottom:1px solid transparent;padding-bottom:1px}
+.files a:hover,.files a:focus-visible{border-bottom-color:var(--accent);outline:none}
+
+.route{display:flex;flex-direction:column;gap:2px;padding:9px 0;border-top:1px solid var(--edge)}
+.route:first-of-type{border-top:0;padding-top:0}
+.route code{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink)}
+.route em{font-style:normal;font-size:12px;color:var(--ink-2)}
+
+.note{font-size:12px;color:var(--ink-2);border-left:2px solid var(--warn);padding-left:11px}
+
+/* ---- table view ---- */
+.tablewrap{overflow-x:auto;border:1px solid var(--edge);border-radius:3px;background:var(--surface);box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;min-width:420px}
+th,td{padding:8px 14px;text-align:right;border-bottom:1px solid var(--edge);font-size:13px}
+th{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);text-align:right}
+th:first-child,td:first-child{text-align:left}
+td{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+tbody tr:last-child td{border-bottom:0}
+
+.foot{font-size:12px;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:6px 18px}
+
+@media (prefers-reduced-motion:reduce){
+  .anim .bar .fill,.anim .bar .cap2{transition:none}
+}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+  <div class="rail">
+    <div class="ident">
+      <h1>MCXA153 Bench Monitor</h1>
+      <div class="sub">FRDM-MCXA153 &middot; bare-metal audio workstation &middot; ESP8266 SoftAP</div>
+    </div>
+    <div class="railstat">
+      <div class="legend">Uptime</div>
+      <b id="uptime">0.0 s</b>
+    </div>
+    <div class="railstat">
+      <div class="legend">Requests</div>
+      <b id="reqs">0</b>
+    </div>
+    <div class="lamp" id="lamp">
+      <span class="dot"></span>
+      <span>
+        <span class="txt">MCXA153</span>
+        <span class="note">192.168.4.1:80</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <span class="legend" style="margin:0 2px 0 0">View</span>
+    <div class="seg" role="group" aria-label="Spectrum view">
+      <button id="vChart" aria-pressed="true">Chart</button>
+      <button id="vTable" aria-pressed="false">Table</button>
+    </div>
+  </div>
+
+  <div class="screen" id="screen">
+    <div class="cap">
+      <span class="legend">Input spectrum &mdash; 16 bands, DC to 8 kHz</span>
+      <span class="val" id="specMeta">500 Hz / band</span>
+    </div>
+    <div class="plot">
+      <div class="grid" id="grid"></div>
+      <div class="bars" id="bars"></div>
+      <div class="baseline"></div>
+    </div>
+    <div class="axis">
+      <span>0</span><span>2k</span><span>4k</span><span>6k</span><span>8k</span>
+    </div>
+    <div class="tip" id="tip"><b></b><span></span></div>
+  </div>
+
+  <div class="tablewrap" id="tableView" hidden>
+    <table>
+      <caption class="legend" style="padding:12px 14px;text-align:left;caption-side:top">Input spectrum, 16 bands</caption>
+      <thead><tr><th scope="col">Band</th><th scope="col">Range</th><th scope="col">Magnitude</th><th scope="col">Peak</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="tiles">
+    <div class="tile">
+      <span class="legend">Input level</span>
+      <span class="big" id="lvl">0<s>/255</s></span>
+      <span class="meter" id="lvlMeter"><i style="width:0%"></i></span>
+    </div>
+    <div class="tile">
+      <span class="legend">Voice effect</span>
+      <span class="big" id="filt">OFF</span>
+      <span style="font-size:12px;color:var(--ink-2)">SW2 cycles OFF / WARM / PHONE / ROBOT</span>
+    </div>
+    <div class="tile">
+      <span class="legend">Sample rate</span>
+      <span class="big">16.0<s>kHz</s></span>
+      <span style="font-size:12px;color:var(--ink-2)">12-bit LPADC0 ch8 on P1_10</span>
+    </div>
+    <div class="tile">
+      <span class="legend">Output carrier</span>
+      <span class="big">960<s>kHz</s></span>
+      <span style="font-size:12px;color:var(--ink-2)">1st-order PDM on P3_12, RC filtered</span>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <h2>SD recorder</h2>
+      <div class="body">
+        <span class="chip idle" id="recChip"><span class="g"></span><span id="recTxt">Idle</span></span>
+        <div class="kv"><span class="k">Card</span><span class="v" id="sdPresent">detected</span></div>
+        <div class="kv"><span class="k">Elapsed</span><span class="v" id="elapsed">0.0 s</span></div>
+        <div class="kv"><span class="k">Free space</span><span class="v" id="free">&mdash;</span></div>
+        <div class="kv"><span class="k">Write rate</span><span class="v">31.25 kB/s</span></div>
+        <div>
+          <div class="legend" style="margin-bottom:6px">Recordings</div>
+          <ul class="files" id="files"></ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Access point &amp; endpoints</h2>
+      <div class="body">
+        <div class="kv"><span class="k">SSID</span><span class="v">MCXA153-AudioWS</span></div>
+        <div class="kv"><span class="k">Passphrase</span><span class="v">synth1234</span></div>
+        <div class="kv"><span class="k">Address</span><span class="v">192.168.4.1:80</span></div>
+        <div>
+          <div class="route"><code>GET /status</code><em>Level, effect, card state, uptime, 16 spectrum bands</em></div>
+          <div class="route"><code>GET /files</code><em>Recordings in the card root</em></div>
+          <div class="route"><code>GET /download?file=</code><em>One WAV, sent in 512-byte chunks</em></div>
+        </div>
+        <p class="note">Join the access point, then open this page. It polls <code>/status</code> once a second and re-reads <code>/files</code> every eight.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>16 bands &times; 500 Hz &mdash; Nyquist 8 kHz at 16 kHz sampling</span>
+    <span>Bar colour tracks magnitude on a single-hue ramp</span>
+    <span>White caps are peak-hold</span>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var DEVICE = "http://192.168.4.1";
+  var BANDS = 16, BAND_HZ = 500;
+  /* 1 Hz, not faster. A /status reply is ~310 bytes; at 115200 baud that is
+     ~27ms of shifting on its own, and each reply also costs an AT+CIPSEND
+     handshake, a SEND OK and an AT+CIPCLOSE round trip. Polling harder than
+     the link can answer only queues requests. */
+  var POLL_MS = 1000, FILES_MS = 8000;
+  /* /status reports level on the engine's raw 0-32767 scale, but after the
+     fixed 4x gain a normal speaking voice sits well under 10k. This is the
+     same full-scale the on-board meter uses (METER_FULL_SCALE in
+     ui_display.c), so the page and the LCD agree on what "loud" looks like. */
+  var LEVEL_FS = 9000;
+
+  var barsEl = document.getElementById('bars');
+  var gridEl = document.getElementById('grid');
+  var tip    = document.getElementById('tip');
+  var screenEl = document.getElementById('screen');
+
+  /* --- build the plot --- */
+  [0.25,0.5,0.75].forEach(function(f){
+    var i = document.createElement('i');
+    i.style.bottom = (f*100)+'%';
+    gridEl.appendChild(i);
+  });
+
+  var bars = [], peaks = new Array(BANDS).fill(0), vals = new Array(BANDS).fill(0);
+  for (var i=0;i<BANDS;i++){
+    var b = document.createElement('button');
+    b.className = 'bar'; b.type = 'button';
+    b.setAttribute('aria-label', 'Band '+(i+1));
+    b.innerHTML = '<span class="fill"></span><span class="cap2"></span>';
+    b.dataset.i = i;
+    barsEl.appendChild(b);
+    bars.push({el:b, fill:b.firstChild, cap:b.lastChild});
+  }
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) screenEl.classList.add('anim');
+
+  /* Single-hue sequential ramp: quiet bands sit back, loud bands come forward.
+     Height already encodes magnitude, so colour is deliberately redundant
+     rather than a second, competing dimension. */
+  var RAMP = ['#14605C','#1A8880','#22B3A5','#48E8D4'];
+  function hex2rgb(h){ return [parseInt(h.substr(1,2),16),parseInt(h.substr(3,2),16),parseInt(h.substr(5,2),16)]; }
+  var RGB = RAMP.map(hex2rgb);
+  function rampColor(t){
+    t = Math.max(0, Math.min(1, t)) * (RGB.length-1);
+    var i = Math.min(RGB.length-2, Math.floor(t)), f = t - i;
+    var a = RGB[i], b = RGB[i+1];
+    return 'rgb('+Math.round(a[0]+(b[0]-a[0])*f)+','+Math.round(a[1]+(b[1]-a[1])*f)+','+Math.round(a[2]+(b[2]-a[2])*f)+')';
+  }
+
+  /* --- simulated signal: drifting formants over a 1/f tilt, gated by a
+     syllable envelope, so the demo reads as speech rather than noise. --- */
+  function simulate(t){
+    var env = 0.42 + 0.58 * Math.pow(Math.max(0, Math.sin(t*2.1)*0.5+0.5), 1.2)
+                          * (0.72 + 0.28*Math.sin(t*0.63));
+    var f1 = 2.1 + 1.3*Math.sin(t*0.87);
+    var f2 = 6.8 + 2.3*Math.sin(t*0.54 + 1.7);
+    var out = [];
+    for (var i=0;i<BANDS;i++){
+      var tilt = 0.40*Math.exp(-i*0.115);
+      var p1 = Math.exp(-Math.pow(i-f1,2)/2.3);
+      var p2 = 0.52*Math.exp(-Math.pow(i-f2,2)/5.2);
+      var v = (tilt + p1 + p2) * env + 0.045*Math.random();
+      out.push(Math.max(0, Math.min(255, Math.round(v*205))));
+    }
+    return out;
+  }
+  function simState(t){
+    var f = simulate(t);
+    var sum = f.reduce(function(a,b){return a+b;},0);
+    return {
+      fft: f,
+      level: Math.min(LEVEL_FS, Math.round(sum/BANDS*36)), /* raw scale, as the board reports it */
+      filter: 'OFF',
+      sd_present: true,
+      sd_recording: recSim,
+      sd_free_kb: 1958400 - Math.round(recElapsed()/1000*31.25),
+      uptime_ms: Math.round(t*1000)
+    };
+  }
+
+  /* Recording state while no board is answering. The real REC button is on the
+     device, so there is nothing for the page to toggle -- this only drives the
+     recorder card so its layout can be seen in its active state. */
+  var recSim = true, recStart = performance.now();
+  function recElapsed(){ return recSim ? (performance.now() - recStart) : 0; }
+
+  /* --- rendering --- */
+  var lastPeakTick = 0;
+  function render(s, isLive){
+    var f = s.fft || [];
+    var now = performance.now();
+    var decay = (now - lastPeakTick) > 60; lastPeakTick = decay ? now : lastPeakTick;
+
+    for (var i=0;i<BANDS;i++){
+      var v = Math.max(0, Math.min(255, f[i]|0));
+      vals[i] = v;
+      if (v > peaks[i]) peaks[i] = v;
+      else if (decay) peaks[i] = Math.max(v, peaks[i] * 0.90 - 1);
+      var b = bars[i];
+      b.fill.style.height = (v/255*100)+'%';
+      b.fill.style.background = rampColor(v/255);
+      b.cap.style.bottom = (peaks[i]/255*100)+'%';
+      b.cap.style.opacity = peaks[i] > 4 ? '.85' : '0';
+      b.el.setAttribute('aria-label', 'Band '+(i+1)+', '+(i*BAND_HZ)+' to '+((i+1)*BAND_HZ)+' hertz, magnitude '+v+' of 255');
+    }
+
+    var lvl = Math.max(0, Math.min(255, Math.round((s.level|0) * 255 / LEVEL_FS)));
+    document.getElementById('lvl').innerHTML = lvl + '<s>/255</s>';
+    var m = document.getElementById('lvlMeter');
+    m.firstElementChild.style.width = (lvl/255*100)+'%';
+    m.classList.toggle('hot', lvl > 210);
+
+    document.getElementById('filt').textContent = String(s.filter || 'OFF').toUpperCase();
+    document.getElementById('uptime').textContent = (Math.round((s.uptime_ms||0)/100)/10).toFixed(1) + ' s';
+    document.getElementById('sdPresent').textContent = s.sd_present ? 'detected' : 'not detected';
+    document.getElementById('free').textContent = s.sd_free_kb != null
+      ? (s.sd_free_kb/1024).toFixed(1) + ' MB' : '—';
+
+    var rec = !!s.sd_recording;
+    var chip = document.getElementById('recChip');
+    chip.className = 'chip ' + (rec ? 'rec' : 'idle');
+    document.getElementById('recTxt').textContent = rec ? 'Recording' : 'Idle';
+    document.getElementById('elapsed').textContent =
+      ((isLive ? (s.rec_ms||0) : recElapsed())/1000).toFixed(1) + ' s';
+
+    if (!tableView.hidden) renderTable();
+  }
+
+  function renderTable(){
+    var rows = '';
+    for (var i=0;i<BANDS;i++){
+      rows += '<tr><td>'+(i+1)+'</td><td>'+(i*BAND_HZ)+'–'+((i+1)*BAND_HZ)+' Hz</td><td>'+vals[i]+'</td><td>'+Math.round(peaks[i])+'</td></tr>';
+    }
+    document.getElementById('tbody').innerHTML = rows;
+  }
+
+  /* --- files --- */
+  function renderFiles(list){
+    var ul = document.getElementById('files');
+    if (!list.length){ ul.innerHTML = '<li><span class="nm" style="color:var(--ink-3)">none</span></li>'; return; }
+    ul.innerHTML = list.map(function(n){
+      var href = DEVICE + '/download?file=' + encodeURIComponent(n);
+      return '<li><span class="nm">'+n+'</span><a href="'+href+'">Download</a></li>';
+    }).join('');
+  }
+
+  /* --- polling --- */
+  var live = false, t0 = performance.now();
+
+  async function fetchJSON(path){
+    var ctl = new AbortController();
+    var to = setTimeout(function(){ ctl.abort(); }, 700);
+    try{
+      var r = await fetch(DEVICE + path, {signal: ctl.signal, cache: 'no-store'});
+      if (!r.ok) throw new Error('http ' + r.status);
+      return await r.json();
+    } finally { clearTimeout(to); }
+  }
+
+  async function tick(){
+    var t = (performance.now() - t0) / 1000;
+    try {
+      var s = await fetchJSON('/status');
+      live = true; render(s, true);
+    } catch(e){
+      live = false; render(simState(t), false);
+    }
+  }
+
+  var demoFiles = ['REC0001.WAV','REC0002.WAV','REC0003.WAV'];
+  async function tickFiles(){
+    if (!live){ renderFiles(demoFiles); return; }
+    try {
+      var r = await fetchJSON('/files');
+      renderFiles(r.files || []);
+    } catch(e){ renderFiles(demoFiles); }
+  }
+
+  /* --- controls --- */
+  var tableView = document.getElementById('tableView');
+  function setView(v){
+    var isTable = v === 'table';
+    tableView.hidden = !isTable;
+    screenEl.hidden = isTable;
+    document.getElementById('vChart').setAttribute('aria-pressed', String(!isTable));
+    document.getElementById('vTable').setAttribute('aria-pressed', String(isTable));
+    if (isTable) renderTable();
+  }
+  document.getElementById('vChart').onclick = function(){ setView('chart'); };
+  document.getElementById('vTable').onclick = function(){ setView('table'); };
+
+  /* --- hover tooltip --- */
+  function showTip(i, el){
+    var r = el.getBoundingClientRect(), s = screenEl.getBoundingClientRect();
+    tip.querySelector('b').textContent = (i*BAND_HZ) + '–' + ((i+1)*BAND_HZ) + ' Hz';
+    tip.querySelector('span').textContent = 'magnitude ' + vals[i] + ' / 255  ·  peak ' + Math.round(peaks[i]);
+    tip.style.left = (r.left - s.left + r.width/2) + 'px';
+    tip.style.top  = (r.top - s.top - 8) + 'px';
+    tip.classList.add('on');
+  }
+  barsEl.addEventListener('mouseover', function(e){
+    var b = e.target.closest('.bar'); if (b) showTip(+b.dataset.i, b);
+  });
+  barsEl.addEventListener('focusin', function(e){
+    var b = e.target.closest('.bar'); if (b) showTip(+b.dataset.i, b);
+  });
+  barsEl.addEventListener('mouseleave', function(){ tip.classList.remove('on'); });
+  barsEl.addEventListener('focusout', function(){ tip.classList.remove('on'); });
+
+  /* --- start populated, so the first frame is never an empty shell --- */
+  render(simState(0.6), false);
+  renderFiles(demoFiles, false);
+  setInterval(tick, POLL_MS);
+  setInterval(tickFiles, FILES_MS);
+  tick(); tickFiles();
+})();
+</script>
+
+</body>
+</html>
