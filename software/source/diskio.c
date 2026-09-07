@@ -16,6 +16,18 @@
 #include "fsl_common.h"
 #include "fsl_reset.h"
 
+/* Bring-up here can only ever be debugged against a real card, so the
+ * step-by-step trace stays in the source with one switch to silence it. */
+#ifndef SD_DEBUG
+#define SD_DEBUG 1
+#endif
+#if SD_DEBUG
+#include <stdio.h>
+#define SD_TRACE(...) printf(__VA_ARGS__)
+#else
+#define SD_TRACE(...) ((void)0)
+#endif
+
 /* Bus pins shared with the LCD (see ui_display.c) */
 #define SPI_SCK_GPIO  GPIO2
 #define SPI_SCK_PIN   12U
@@ -36,6 +48,35 @@
 static uint8_t s_card_type = 0; /* bit0: SDv1/MMC, bit1: SDv2, bit2: block-addressed (SDHC/SDXC) */
 static volatile DSTATUS s_status = STA_NOINIT;
 
+/* Clock throttle for the identification phase.
+ *
+ * This bit-bang has no rate limit of its own: it toggles GPIO as fast as the
+ * core can, which lands somewhere in the MHz. The ILI9341 is perfectly happy
+ * there (that's why the LCD works), but the SD spec requires CMD0/CMD8/ACMD41
+ * to be clocked at 100-400kHz, and plenty of cards simply do not answer above
+ * that -- CMD0 then never returns 0x01 and the card reads as absent no matter
+ * how it's wired. So stretch both clock half-periods during init, then drop
+ * back to full speed for block transfers once the card is up.
+ *
+ * The per-iteration cost of the busy-wait below is a guess (a volatile
+ * load/compare/increment/store/branch), deliberately on the low side so the
+ * error lands on the safe side: too slow only costs a slower mount. */
+#define SD_INIT_CLOCK_HZ       200000U
+#define SD_DELAY_CYCLES_PER_IT 6U
+
+/* Retry budget for the ACMD41/CMD1 "leave idle" poll. These used to be 20000,
+ * which was fine when the bus ran at MHz speed; at the throttled ~200kHz one
+ * pass costs roughly 1.5ms, so 20000 would stall a mount for half a minute on
+ * a card that never comes up. The spec gives a card 1 second to finish
+ * initialising, so ~2s of budget is generous. */
+#define SD_IDLE_POLL_TRIES 1400
+
+static uint32_t s_spi_half_delay = 0; /* 0 = full speed */
+
+static inline void SpiHalfDelay(void) {
+    for (volatile uint32_t i = 0; i < s_spi_half_delay; i++) { }
+}
+
 static inline void CS_LOW(void)  { SD_CS_GPIO->PCOR = CS_BIT; }
 static inline void CS_HIGH(void) { SD_CS_GPIO->PSOR = CS_BIT; }
 
@@ -46,9 +87,11 @@ static inline uint8_t SD_SPI_Xfer(uint8_t out) {
         if (out & 0x80) SPI_MOSI_GPIO->PSOR = MOSI_BIT;
         else            SPI_MOSI_GPIO->PCOR = MOSI_BIT;
         out = (uint8_t)(out << 1);
+        SpiHalfDelay(); /* data setup, SCK low */
         SPI_SCK_GPIO->PSOR = SCK_BIT;
         in = (uint8_t)(in << 1);
         if (SPI_MISO_GPIO->PDIR & MISO_BIT) in |= 1U;
+        SpiHalfDelay(); /* SCK high */
     }
     return in;
 }
@@ -101,24 +144,48 @@ DSTATUS disk_initialize(BYTE pdrv) {
     gpio_pin_config_t in_cfg = {kGPIO_DigitalInput, 0};
     GPIO_PinInit(SPI_MISO_GPIO, SPI_MISO_PIN, &in_cfg);
 
+    /* Everything from here to the end of identification runs at <=400kHz. */
+    s_spi_half_delay = SystemCoreClock / (SD_INIT_CLOCK_HZ * 2U * SD_DELAY_CYCLES_PER_IT);
+
     CS_HIGH();
     for (int i = 0; i < 10; i++) SD_SPI_Xfer(0xFF); /* >=74 dummy clocks with CS high */
 
-    CS_LOW();
-    uint8_t r1 = SD_SendCmd(0, 0); /* GO_IDLE_STATE */
-    if (r1 != 0x01) { CS_HIGH(); s_status = STA_NOINIT; return s_status; }
+    /* A card that just saw its first clocks often needs CMD0 more than once
+     * before it answers 0x01, so give it several tries rather than declaring
+     * the slot empty on the first miss. */
+    uint8_t r1 = 0xFF;
+    for (int attempt = 0; attempt < 8; attempt++) {
+        CS_LOW();
+        r1 = SD_SendCmd(0, 0); /* GO_IDLE_STATE */
+        if (r1 == 0x01) break;
+        CS_HIGH();
+        SD_SPI_Xfer(0xFF);
+    }
+    SD_TRACE("[sd] CMD0 -> 0x%02X\r\n", r1);
+    if (r1 != 0x01) {
+        /* 0xFF here means nothing ever drove MISO: no card, or a wiring
+         * problem on MISO/CS. Any other value means the card is talking but
+         * didn't go idle. */
+        CS_HIGH();
+        s_spi_half_delay = 0;
+        s_status = STA_NOINIT;
+        return s_status;
+    }
 
     uint8_t ocr[4];
     s_card_type = 0;
     r1 = SD_SendCmd(8, 0x1AAU); /* CMD8: check voltage range, distinguishes SDv2 */
+    SD_TRACE("[sd] CMD8 -> 0x%02X\r\n", r1);
     if (r1 == 0x01) {
         for (int i = 0; i < 4; i++) ocr[i] = SD_SPI_Xfer(0xFF);
+        SD_TRACE("[sd] CMD8 echo %02X %02X %02X %02X\r\n", ocr[0], ocr[1], ocr[2], ocr[3]);
         if (ocr[2] == 0x01 && ocr[3] == 0xAA) {
-            int timeout = 20000;
+            int timeout = SD_IDLE_POLL_TRIES;
             do {
                 SD_SendCmd(55, 0);
                 r1 = SD_SendCmd(41, 0x40000000U); /* ACMD41 with HCS bit (SDv2) */
             } while (r1 != 0 && --timeout);
+            SD_TRACE("[sd] ACMD41 -> 0x%02X (%d tries left)\r\n", r1, timeout);
             if (timeout && r1 == 0) {
                 SD_SendCmd(58, 0); /* READ_OCR */
                 for (int i = 0; i < 4; i++) ocr[i] = SD_SPI_Xfer(0xFF);
@@ -129,20 +196,26 @@ DSTATUS disk_initialize(BYTE pdrv) {
         SD_SendCmd(55, 0);
         r1 = SD_SendCmd(41, 0);
         if (r1 <= 1) {
-            int timeout = 20000;
+            int timeout = SD_IDLE_POLL_TRIES;
             do {
                 SD_SendCmd(55, 0);
                 r1 = SD_SendCmd(41, 0);
             } while (r1 != 0 && --timeout);
             if (timeout) s_card_type = 1; /* SDv1 */
         } else {
-            int timeout = 20000;
+            int timeout = SD_IDLE_POLL_TRIES;
             do { r1 = SD_SendCmd(1, 0); } while (r1 != 0 && --timeout); /* MMCv3 */
             if (timeout) s_card_type = 8;
         }
     }
     CS_HIGH();
     SD_SPI_Xfer(0xFF);
+
+    /* Identification is over; block transfers can run at full bit-bang speed. */
+    s_spi_half_delay = 0;
+
+    SD_TRACE("[sd] card_type=0x%02X -> %s\r\n", s_card_type,
+             s_card_type ? "READY" : "NOT DETECTED");
 
     s_status = (s_card_type == 0) ? STA_NOINIT : 0;
     return s_status;
